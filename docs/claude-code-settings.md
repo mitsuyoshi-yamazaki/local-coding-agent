@@ -81,7 +81,7 @@
 
 | 手段 | 設定 |
 |---|---|
-| sandbox | `network.deniedDomains` を `["*"]` にし、sandbox の中のコマンドは外へ出られない。許すドメインには、どの設定ファイルの `WebFetch(domain:…)` の許可も合わさるので、許すドメインを空にするだけでは、利用者の設定の許可で外へ出られる。拒むドメインは許すドメインに勝つ |
+| sandbox | `network.deniedDomains` を `["*"]` にし、sandbox の中のコマンドは外へ出られない。拒むドメインは許すドメインに勝つ。許すドメインを空にするだけでは外へ出られた（下の「止まるかを確かめた操作」） |
 | deny | `curl`・`wget`・`ssh`・`scp`・`rsync`・`gh`・MCP の全ての道具（`mcp__*`）・`Artifact`・`ArtifactComments`・`ArtifactData`・`RemoteTrigger` |
 | allow | WebFetch・WebSearch（読むだけの道具） |
 
@@ -121,8 +121,10 @@
 
 | 要件 | 手段 |
 |---|---|
-| docs/ の書き方 | rule（`.claude/rules/docs.md`） |
-| 記録・受け渡し・commit するもの | CLAUDE.md |
+| docs/ の書き方（規則は skill か rule にする） | rule（`.claude/rules/docs.md`） |
+| 誰が書くか（人が書くか、Claude Code が書くか） | CLAUDE.md（仕様を決めるときに確かめる） |
+| 機能ごとの記録の項目 | 要件（CLAUDE.md が読み込む） |
+| 受け渡し・commit するもの | CLAUDE.md |
 | lint と型の検査 | `pyproject.toml` の設定と、CLAUDE.md の「commit の前に走らせる」 |
 | 要件を守っているかを確かめる lint | 無い |
 
@@ -149,3 +151,5 @@
 | `git push --dry-run` | ask で人に確かめられた |
 
 試していないもの: `mv`・`git restore` などの、上で試したものと同じ形の deny。`cd` と `poetry` の ask。
+
+許すドメインを空にしただけで外へ出られた原因は、確かめていない。許すドメインは、`allowedDomains` と、どの設定ファイルの `WebFetch(domain:…)` の allow とも合わさる。このリポジトリの allow にある `WebFetch` はドメインを指定しない形で、公式の文書では、この形は sandbox の中のコマンドが届く先を変えない。確かめるには `deniedDomains` を外して試す必要があり、そのあいだ sandbox の中のコマンドが外へ出られるので、行っていない。
