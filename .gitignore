@@ -1,0 +1,12 @@
+# 上流のリポジトリとの受け渡しのファイル。公開しない
+docs/inbox/
+docs/outbox/
+
+# 手元だけの Claude Code の設定
+.claude/settings.local.json
+
+# Node
+node_modules/
+
+# macOS
+.DS_Store
