@@ -1,0 +1,8 @@
+[project]
+name = "local-coding-agent"
+description = "ローカル LLM で動くコーディングエージェント"
+requires-python = ">=3.14,<3.15"
+dependencies = []
+
+[tool.poetry]
+package-mode = false
