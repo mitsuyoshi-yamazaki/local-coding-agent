@@ -29,7 +29,7 @@ description: docs/requirements.md の要件から、CLAUDE.md・Claude Code の�
 
 ### 2. 今の Claude Code の設定方法を、公式の文書で確かめる
 
-設定の方法は版で変わるので、前回の書き起こしを当てにしない。版は `claude --version` で読む。
+設定の方法は版で変わるので、前回の書き起こしを当てにしない。版は持ち主に、端末で `claude --version` を走らせて確かめてもらう（sandbox の中からは `~/.local` の `claude` を読めず、走らない）。分からなければ、分からないと対応表に書く。
 
 確かめる文書（https://code.claude.com/docs/en/ の下。目次は https://code.claude.com/docs/llms.txt ）:
 
