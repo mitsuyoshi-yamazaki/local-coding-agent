@@ -1,7 +1,120 @@
 {
   "permissions": {
+    "allow": [
+      "Bash(git fetch *)",
+      "Bash(git pull *)",
+      "Bash(git ls-remote *)",
+      "Bash(git remote -v)",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "ask": [
+      "Bash(git push *)",
+      "Bash(git remote add *)",
+      "Bash(git remote set-url *)",
+      "Bash(git remote remove *)",
+      "Bash(git remote rm *)",
+      "Bash(git remote rename *)",
+      "Bash(git remote set-head *)",
+      "Bash(git remote prune *)",
+      "Bash(git checkout *)",
+      "Bash(git switch *)",
+      "Bash(cd *)",
+      "Bash(poetry *)",
+      "Edit(/CLAUDE.md)",
+      "Edit(/.claude/**)",
+      "Edit(/pyproject.toml)",
+      "Edit(/poetry.toml)",
+      "Edit(/poetry.lock)",
+      "Edit(/.gitignore)"
+    ],
     "deny": [
-      "Bash(git push:*)"
+      "Bash(rm *)",
+      "Bash(rmdir *)",
+      "Bash(unlink *)",
+      "Bash(mv *)",
+      "Bash(find * -delete*)",
+      "Bash(git rm *)",
+      "Bash(git mv *)",
+      "Bash(git clean *)",
+      "Bash(git restore *)",
+      "Bash(git reset --hard *)",
+      "Bash(git checkout -- *)",
+      "Bash(git checkout .)",
+      "Bash(git stash drop *)",
+      "Bash(git stash clear *)",
+      "Bash(git branch -d *)",
+      "Bash(git branch -D *)",
+      "Bash(git tag -d *)",
+      "Bash(git worktree remove *)",
+      "Bash(poetry env remove *)",
+      "Bash(uv tool *)",
+      "Bash(pipx *)",
+      "Bash(brew *)",
+      "Bash(pip install *)",
+      "Bash(pip3 install *)",
+      "Bash(ollama pull *)",
+      "Bash(ollama rm *)",
+      "Bash(ollama create *)",
+      "Bash(ollama cp *)",
+      "Bash(ollama push *)",
+      "Bash(git -C *)",
+      "Bash(git -c *)",
+      "Bash(sh -c *)",
+      "Bash(bash -c *)",
+      "Bash(zsh -c *)",
+      "Bash(eval *)",
+      "Bash(curl *)",
+      "Bash(wget *)",
+      "Bash(ssh *)",
+      "Bash(scp *)",
+      "Bash(rsync *)",
+      "Bash(gh *)",
+      "Bash(env)",
+      "Bash(env *)",
+      "Bash(printenv*)",
+      "Bash(export)",
+      "Bash(set)",
+      "Bash(security *)",
+      "Bash(*$*)",
+      "Read(**/.env)",
+      "Read(**/.env.*)",
+      "Read(~/.ssh/**)",
+      "Read(~/.aws/**)",
+      "Read(~/.gnupg/**)",
+      "Read(~/.netrc)",
+      "Read(~/.config/gh/**)",
+      "Read(~/Library/Keychains/**)",
+      "Edit(/docs/inbox/**)",
+      "mcp__*",
+      "Artifact",
+      "ArtifactComments",
+      "ArtifactData",
+      "RemoteTrigger"
+    ],
+    "blockReadsOutsideWorkingDirectories": true
+  },
+  "sandbox": {
+    "enabled": true,
+    "allowUnsandboxedCommands": false,
+    "excludedCommands": ["git *", "poetry *"],
+    "network": {
+      "allowedDomains": [],
+      "deniedDomains": ["*"]
+    }
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/guard_paths.py",
+            "args": []
+          }
+        ]
+      }
     ]
   }
 }

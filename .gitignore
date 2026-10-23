@@ -5,10 +5,15 @@ docs/outbox/
 # 手元だけの Claude Code の設定
 .claude/settings.local.json
 
+# 一時ファイルの置き場
+.tmp/
+
 # Python
 __pycache__/
 *.py[cod]
 .venv/
+.mypy_cache/
+.ruff_cache/
 
 # macOS
 .DS_Store

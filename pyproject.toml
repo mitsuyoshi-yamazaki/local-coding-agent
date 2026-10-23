@@ -6,3 +6,15 @@ dependencies = []
 
 [tool.poetry]
 package-mode = false
+
+[dependency-groups]
+dev = [
+    "ruff (>=0.17.2,<0.18.0)",
+    "mypy (>=2.4.0,<3.0.0)"
+]
+
+# Ruff は既定の規則を使う。対象の Python の版は requires-python から読む
+[tool.mypy]
+strict = true
+# 検査する場所。コードの置き場を作ったら足す（"." は点で始まるディレクトリを辿らず、.py が無いと失敗する）
+files = [".claude/hooks"]
