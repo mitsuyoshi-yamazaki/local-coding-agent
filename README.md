@@ -65,6 +65,7 @@ ollama pull gpt-oss:20b
 | `--model` | Ollama のモデルの名前。必須 |
 | `--host` | Ollama の URL。既定は `http://localhost:11434` |
 | `--system-prompt-file` | 指示の部分を、このファイルの中身（UTF-8）に差し替える。作業ディレクトリなどの環境の節は残る。無ければ既定の指示を使う |
+| `--debug` | Ollama の応答を全て表示する。値を付けないと、推論の文（thinking）を薄い色で本文の前に出し、本文と推論の文のほかの欄を JSON で出す（終わりの行は全ての欄）。`--debug raw` では、Ollama から届いた行（1行に1つの JSON）をそのまま出す |
 
 ## 使い方
 

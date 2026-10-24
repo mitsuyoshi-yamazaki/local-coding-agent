@@ -4,24 +4,43 @@
 全体を送る。利用者の発言には、送った時刻を付ける。
 """
 
+import json
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Literal, TextIO
 
+from local_coding_agent.cli.screen import Screen
 from local_coding_agent.model.chat import (
     ChatModel,
     ChatRequest,
     Done,
     ModelError,
+    OtherFields,
+    RawLine,
+    StreamEvent,
     TextDelta,
+    ThinkingDelta,
 )
 from local_coding_agent.model.messages import Message, assistant_text, user_text
 from local_coding_agent.trace.writer import TraceSink
 
 type Status = Literal["done", "cancelled", "error"]
 
+# デバッグの表示。off: しない・readable: 推論の文と、本文のほかの欄も出す・
+# raw: モデルから届いた行を、そのまま出す（本文はその中にある）
+type DebugMode = Literal["off", "readable", "raw"]
+
 PROMPT = "> "
+
+
+@dataclass(frozen=True)
+class Display:
+    """表示の設定。起動の引数と、出力が端末かどうかで決める。"""
+
+    # 推論の文や数値の行を薄くするなど、色を付けるか
+    color: bool = False
+    debug: DebugMode = "off"
 
 
 @dataclass(frozen=True)
@@ -38,6 +57,7 @@ class Session:
     clock: Callable[[], float]
     # 発言に付ける、今の時刻（時差つき）
     now: Callable[[], datetime]
+    display: Display = field(default_factory=Display)
 
 
 @dataclass(frozen=True)
@@ -83,15 +103,16 @@ def run_turn(
     session.trace.write(
         {"type": "request", "turn": turn, "url": request.url, "body": request.body}
     )
-    outcome = receive(session, request)
+    screen = Screen(session.output, session.display.color)
+    outcome = receive(session, request, screen)
     session.trace.write(response_record(turn, outcome))
-    session.output.write("\n" + summary(outcome) + "\n")
+    screen.line(summary(outcome))
     if outcome.status != "done":
         return history
     return (*messages, assistant_text(outcome.text))
 
 
-def receive(session: Session, request: ChatRequest) -> Outcome:
+def receive(session: Session, request: ChatRequest, screen: Screen) -> Outcome:
     """応答を届いた順に表示し、本文と時間を集める。"""
     started = session.clock()
     text = ""
@@ -99,13 +120,12 @@ def receive(session: Session, request: ChatRequest) -> Outcome:
     done: Done | None = None
     try:
         for event in session.model.stream(request):
+            show(screen, session.display.debug, event)
             if isinstance(event, TextDelta):
                 if first is None:
                     first = session.clock() - started
                 text += event.text
-                session.output.write(event.text)
-                session.output.flush()
-            else:
+            elif isinstance(event, Done):
                 done = event
     except KeyboardInterrupt:
         return Outcome("cancelled", text, None, first, session.clock() - started)
@@ -118,6 +138,19 @@ def receive(session: Session, request: ChatRequest) -> Outcome:
             "error", text, None, first, elapsed, "応答が終わりの行の前に切れた"
         )
     return Outcome("done", text, done, first, elapsed)
+
+
+def show(screen: Screen, debug: DebugMode, event: StreamEvent) -> None:
+    """流れてくる知らせを、デバッグの表示の段に合わせて画面に出す。"""
+    match event:
+        case RawLine(line) if debug == "raw":
+            screen.line(line)
+        case TextDelta(text) if debug != "raw":
+            screen.write(text)
+        case ThinkingDelta(text) if debug == "readable":
+            screen.write(text, "thinking")
+        case OtherFields(fields) if debug == "readable":
+            screen.line(json.dumps(fields, ensure_ascii=False), "note")
 
 
 def response_record(turn: int, outcome: Outcome) -> dict[str, object]:

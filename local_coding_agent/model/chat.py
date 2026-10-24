@@ -30,6 +30,30 @@ class TextDelta:
 
 
 @dataclass(frozen=True)
+class ThinkingDelta:
+    """流れてくる応答の、推論の文（thinking）の断片。デバッグの表示にだけ使う。"""
+
+    text: str
+
+
+@dataclass(frozen=True)
+class OtherFields:
+    """届いた1行の、本文と推論の文のほかの欄。デバッグの表示にだけ使う。
+
+    途中の行では、毎回同じ形で来る欄（モデルの名前・時刻など）を除く。終わりの行では全ての欄を持つ。
+    """
+
+    fields: Mapping[str, object]
+
+
+@dataclass(frozen=True)
+class RawLine:
+    """モデルから届いた1行を、そのままの文字列で。デバッグの表示にだけ使う。"""
+
+    text: str
+
+
+@dataclass(frozen=True)
 class Done:
     """応答の終わり。終わった理由と、モデルの側が数えたトークン数と時間。"""
 
@@ -37,7 +61,9 @@ class Done:
     stats: Mapping[str, int] = field(default_factory=dict)
 
 
-type StreamEvent = TextDelta | Done
+# 1行が届くたびに、RawLine・ThinkingDelta・TextDelta・OtherFields の順に（あるものだけ）返し、
+# 最後の行の後に Done を返す
+type StreamEvent = RawLine | ThinkingDelta | TextDelta | OtherFields | Done
 
 
 class ChatModel(Protocol):

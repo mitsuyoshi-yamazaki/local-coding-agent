@@ -2,6 +2,7 @@
 
 system prompt と会話の形（model/messages.py）を、送る直前に /api/chat の形へ変える。応答は
 NDJSON（1行に1つの JSON）で流れてくるので、1行ずつ読んで本文の断片と終わりの知らせに変える。
+デバッグの表示のために、届いた行そのものと、推論の文・ほかの欄も知らせる。
 """
 
 import json
@@ -14,8 +15,11 @@ from local_coding_agent.model.chat import (
     ChatRequest,
     Done,
     ModelError,
+    OtherFields,
+    RawLine,
     StreamEvent,
     TextDelta,
+    ThinkingDelta,
 )
 from local_coding_agent.model.messages import Message, metadata_text
 
@@ -28,6 +32,12 @@ STAT_KEYS = (
     "prompt_eval_duration",
     "eval_duration",
 )
+
+# 途中の行に毎回同じ形で来る欄。デバッグの表示で、途中の行からは除く
+ROUTINE_KEYS = ("model", "created_at", "done")
+
+# message の中で、文として別に表示する欄（role は常に assistant）
+MESSAGE_TEXT_KEYS = ("role", "content", "thinking")
 
 
 def to_ollama_messages(
@@ -59,13 +69,14 @@ def chat_request_body(
 
 
 def read_stream(lines: Iterable[bytes]) -> Iterator[StreamEvent]:
-    """NDJSON の行を読み、本文の断片と、終わりの知らせに変える。
+    """NDJSON の行を読み、届いた行・推論の文と本文の断片・ほかの欄・終わりの知らせに変える。
 
-    途中で error の行や、JSON として読めない行が届いたら ModelError を投げる。
+    途中で error の行や、JSON として読めない行が届いたら、その行を返してから ModelError を投げる。
     """
     for raw in lines:
         if not raw.strip():
             continue
+        yield RawLine(raw.decode(errors="replace").rstrip("\r\n"))
         try:
             event = json.loads(raw)
         except json.JSONDecodeError as error:
@@ -75,12 +86,35 @@ def read_stream(lines: Iterable[bytes]) -> Iterator[StreamEvent]:
         if "error" in event:
             raise ModelError(f"Ollama が誤りを返した: {event['error']}")
         message = event.get("message")
+        thinking = message.get("thinking", "") if isinstance(message, dict) else ""
         text = message.get("content", "") if isinstance(message, dict) else ""
+        if thinking:
+            yield ThinkingDelta(str(thinking))
         if text:
             yield TextDelta(str(text))
+        others = other_fields(event)
+        if others:
+            yield OtherFields(others)
         if event.get("done") is True:
             yield _done(event)
             return
+
+
+def other_fields(event: dict[str, object]) -> dict[str, object]:
+    """1行の欄から、本文と推論の文を除く。途中の行では、毎回同じ形で来る欄も除く。"""
+    skipped = () if event.get("done") is True else ROUTINE_KEYS
+    head = {
+        key: value
+        for key, value in event.items()
+        if key != "message" and key not in skipped
+    }
+    message = event.get("message")
+    if not isinstance(message, dict):
+        return head if message is None else {**head, "message": message}
+    rest = {
+        key: value for key, value in message.items() if key not in MESSAGE_TEXT_KEYS
+    }
+    return {**head, "message": rest} if rest else head
 
 
 def _done(event: dict[str, object]) -> Done:

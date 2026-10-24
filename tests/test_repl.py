@@ -3,7 +3,15 @@ import unittest
 from datetime import datetime, timedelta, timezone
 
 from local_coding_agent.cli import repl
-from local_coding_agent.model.chat import Done, ModelError, TextDelta
+from local_coding_agent.cli.screen import DIM, RESET
+from local_coding_agent.model.chat import (
+    Done,
+    ModelError,
+    OtherFields,
+    RawLine,
+    TextDelta,
+    ThinkingDelta,
+)
 from local_coding_agent.model.messages import assistant_text, user_text
 from tests.fakes import (
     RecordingTrace,
@@ -16,6 +24,7 @@ from tests.fakes import (
 
 STOP = Done(done_reason="stop", stats={"prompt_eval_count": 7, "eval_count": 2})
 START = datetime(2026, 10, 24, 15, 30, tzinfo=timezone(timedelta(hours=9)))
+PLAIN = repl.Display()
 
 
 def at(minutes: int) -> datetime:
@@ -24,7 +33,9 @@ def at(minutes: int) -> datetime:
 
 
 def run_repl(
-    lines: list[str], script: list[list[Step]]
+    lines: list[str],
+    script: list[list[Step]],
+    display: repl.Display = PLAIN,
 ) -> tuple[ScriptedModel, RecordingTrace, str]:
     """偽物で REPL を走らせ、モデル・記録・画面の出力を返す。"""
     model = ScriptedModel(script)
@@ -38,6 +49,7 @@ def run_repl(
         trace=trace,
         clock=ticking_clock(),
         now=ticking_now(START),
+        display=display,
     )
     repl.run(session)
     return model, trace, output.getvalue()
@@ -132,6 +144,51 @@ class OutputAndTraceTest(unittest.TestCase):
         self.assertEqual(
             response["measured"], {"first_token_seconds": 0.5, "total_seconds": 1.0}
         )
+
+
+# 推論の文から本文へ進み、終わりの行にほかの欄が載った応答
+THINKING_SCRIPT: list[Step] = [
+    RawLine('{"thinking": "考え"}'),
+    ThinkingDelta("考え"),
+    RawLine('{"thinking": "中"}'),
+    ThinkingDelta("中"),
+    RawLine('{"content": "答え"}'),
+    TextDelta("答え"),
+    OtherFields({"done_reason": "stop"}),
+    STOP,
+]
+
+
+class DebugDisplayTest(unittest.TestCase):
+    def test_off_shows_only_text(self) -> None:
+        _, _, output = run_repl(["a"], [THINKING_SCRIPT])
+        self.assertIn("答え", output)
+        self.assertNotIn("考え", output)
+        self.assertNotIn("done_reason", output)
+
+    def test_readable_shows_thinking_text_and_fields_on_own_lines(self) -> None:
+        _, _, output = run_repl(
+            ["a"], [THINKING_SCRIPT], repl.Display(debug="readable")
+        )
+        self.assertIn('考え中\n答え\n{"done_reason": "stop"}\n[入力 7', output)
+        self.assertNotIn('{"thinking"', output)
+
+    def test_raw_shows_received_lines_only(self) -> None:
+        _, trace, output = run_repl(["a"], [THINKING_SCRIPT], repl.Display(debug="raw"))
+        self.assertIn(
+            '{"thinking": "考え"}\n{"thinking": "中"}\n{"content": "答え"}\n[入力 7',
+            output,
+        )
+        self.assertNotIn("考え中", output)
+        self.assertEqual(trace.records[1]["text"], "答え")
+
+    def test_color_dims_thinking_only_when_enabled(self) -> None:
+        display = repl.Display(color=True, debug="readable")
+        _, _, output = run_repl(["a"], [THINKING_SCRIPT], display)
+        self.assertIn(f"{DIM}考え{RESET}", output)
+        self.assertIn("\n答え", output)
+        _, _, plain = run_repl(["a"], [THINKING_SCRIPT], repl.Display(debug="readable"))
+        self.assertNotIn(DIM, plain)
 
 
 if __name__ == "__main__":

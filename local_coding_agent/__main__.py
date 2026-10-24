@@ -1,5 +1,5 @@
 """起動: python -m local_coding_agent --model <モデルのタグ> [--host <URL>]
-[--system-prompt-file <パス>]
+[--system-prompt-file <パス>] [--debug [raw]]
 """
 
 import argparse
@@ -41,6 +41,14 @@ def parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         type=Path,
         help="指示の部分を、このファイルの中身に差し替える（環境の節は残る）",
     )
+    parser.add_argument(
+        "--debug",
+        nargs="?",
+        const="readable",
+        choices=("readable", "raw"),
+        help="Ollama の応答を全て表示する。値なし: 推論の文と、本文のほかの欄も出す。"
+        "raw: 届いた行をそのまま出す",
+    )
     return parser.parse_args(argv)
 
 
@@ -65,6 +73,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         trace=trace,
         clock=time.monotonic,
         now=local_now,
+        display=repl.Display(color=sys.stdout.isatty(), debug=args.debug or "off"),
     )
     repl.run(session)
     return 0

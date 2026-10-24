@@ -1,10 +1,19 @@
 import io
 import unittest
 import urllib.error
+from collections.abc import Iterator
 from datetime import datetime, timedelta, timezone
 from email.message import Message as Headers
 
-from local_coding_agent.model.chat import Done, ModelError, TextDelta
+from local_coding_agent.model.chat import (
+    Done,
+    ModelError,
+    OtherFields,
+    RawLine,
+    StreamEvent,
+    TextDelta,
+    ThinkingDelta,
+)
 from local_coding_agent.model.messages import (
     Message,
     TextBlock,
@@ -23,6 +32,11 @@ from local_coding_agent.model.ollama import (
 def ndjson(*lines: str) -> io.BytesIO:
     """Ollama の応答の本体を真似た、NDJSON のバイト列。"""
     return io.BytesIO("".join(line + "\n" for line in lines).encode())
+
+
+def text_and_done(events: Iterator[StreamEvent]) -> Iterator[StreamEvent]:
+    """本文の断片と終わりの知らせだけを残す（デバッグの表示に使う知らせを除く）。"""
+    return (event for event in events if isinstance(event, TextDelta | Done))
 
 
 class ToOllamaMessagesTest(unittest.TestCase):
@@ -106,7 +120,7 @@ class ReadStreamTest(unittest.TestCase):
             ' "total_duration": 4500000000}',
         )
         self.assertEqual(
-            list(read_stream(body)),
+            list(text_and_done(read_stream(body))),
             [
                 TextDelta("こん"),
                 TextDelta("にちは"),
@@ -124,7 +138,8 @@ class ReadStreamTest(unittest.TestCase):
     def test_done_without_stats(self) -> None:
         body = ndjson('{"message": {"content": "x"}, "done": true}')
         self.assertEqual(
-            list(read_stream(body)), [TextDelta("x"), Done(done_reason=None, stats={})]
+            list(text_and_done(read_stream(body))),
+            [TextDelta("x"), Done(done_reason=None, stats={})],
         )
 
     def test_error_line_raises(self) -> None:
@@ -132,7 +147,7 @@ class ReadStreamTest(unittest.TestCase):
             '{"message": {"content": "途中"}, "done": false}',
             '{"error": "the model failed to generate a response"}',
         )
-        events = read_stream(body)
+        events = text_and_done(read_stream(body))
         self.assertEqual(next(events), TextDelta("途中"))
         with self.assertRaisesRegex(ModelError, "failed to generate"):
             next(events)
@@ -146,9 +161,69 @@ class ReadStreamTest(unittest.TestCase):
             '{"message": {"content": "途中"}, "done": false}',
             '{"message": {"content": "切れ',
         )
-        events = read_stream(body)
+        events = text_and_done(read_stream(body))
         self.assertEqual(next(events), TextDelta("途中"))
         with self.assertRaisesRegex(ModelError, "JSON として読めない"):
+            next(events)
+
+
+class DebugEventsTest(unittest.TestCase):
+    """デバッグの表示に使う知らせ（届いた行・推論の文・ほかの欄）。"""
+
+    def test_whole_stream_in_order(self) -> None:
+        middle = (
+            '{"model": "m", "created_at": "t1", "message": {"role": "assistant",'
+            ' "content": "", "thinking": "考える"}, "done": false}'
+        )
+        last = (
+            '{"model": "m", "created_at": "t2", "message": {"role": "assistant",'
+            ' "content": "答え"}, "done": true, "done_reason": "stop",'
+            ' "eval_count": 3}'
+        )
+        self.assertEqual(
+            list(read_stream(ndjson(middle, last))),
+            [
+                RawLine(middle),
+                ThinkingDelta("考える"),
+                RawLine(last),
+                TextDelta("答え"),
+                OtherFields(
+                    {
+                        "model": "m",
+                        "created_at": "t2",
+                        "done": True,
+                        "done_reason": "stop",
+                        "eval_count": 3,
+                    }
+                ),
+                Done(done_reason="stop", stats={"eval_count": 3}),
+            ],
+        )
+
+    def test_unknown_fields_in_middle_line(self) -> None:
+        line = (
+            '{"model": "m", "message": {"role": "assistant", "content": "",'
+            ' "tool_calls": [{"function": {"name": "f"}}]}, "done": false,'
+            ' "extra": 1}'
+        )
+        others = [e for e in read_stream(ndjson(line)) if isinstance(e, OtherFields)]
+        self.assertEqual(
+            others,
+            [
+                OtherFields(
+                    {
+                        "extra": 1,
+                        "message": {"tool_calls": [{"function": {"name": "f"}}]},
+                    }
+                )
+            ],
+        )
+
+    def test_error_line_is_given_before_raising(self) -> None:
+        line = '{"error": "boom"}'
+        events = read_stream(ndjson(line))
+        self.assertEqual(next(events), RawLine(line))
+        with self.assertRaisesRegex(ModelError, "boom"):
             next(events)
 
 
