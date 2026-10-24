@@ -138,6 +138,8 @@
 | commit するもの | CLAUDE.md |
 | README.md にセットアップ・起動・使い方を書き、機能を足すたびに直す | CLAUDE.md |
 | 作業の進行を `docs/progress.md` に記録し、常に更新する | CLAUDE.md と `.gitignore`（git に入れない）。docs/ の rule は当てない |
+| main 側で確認し、git worktree（`.worktrees/next`）で次の機能を実装する | CLAUDE.md（分担）と `.gitignore`（`.worktrees/`）。worktree 側のセッションは、作業ディレクトリが worktree なので、`blockReadsOutsideWorkingDirectories` と sandbox で main 側のファイルを読めず、hook で worktree の外を編集できない |
+| 実装したセッションから、問いに答えるセッションへの引き継ぎ（`handoff.md`） | rule（`.claude/rules/docs.md`）と CLAUDE.md |
 | 走行の記録を git に入れない | `.gitignore` の `traces/` |
 | テスト・lint・型の検査 | `pyproject.toml` の設定と、CLAUDE.md の「commit の前に走らせる」 |
 | 1ファイル 200 行程度・関数 50 行まで | 要件（CLAUDE.md が読み込む）。lint では検査していない |
