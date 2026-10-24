@@ -132,7 +132,7 @@
 |---|---|
 | docs/ の書き方（規則は skill か rule にする） | rule（`.claude/rules/docs.md`） |
 | 機能ごとの文書の置き場（`docs/features/f-NN-<機能名>/`・実装前の仕様と計測は直さない） | rule（`.claude/rules/docs.md`）と skill `feature-record` |
-| 誰が書くか（人が書くか、Claude Code が書くか） | CLAUDE.md（仕様を決めるときに確かめる） |
+| コードは常に Claude Code が書き、人が読む | 要件（CLAUDE.md が読み込む） |
 | 機能ごとの記録の項目と書き方 | skill `feature-record`（手順と雛形） |
 | 1機能の進め方・inbox と outbox の書式 | 要件（CLAUDE.md が読み込む） |
 | commit するもの | CLAUDE.md |

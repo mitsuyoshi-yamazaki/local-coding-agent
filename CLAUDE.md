@@ -32,7 +32,7 @@
   - inbox・outbox・`docs/progress.md`・outbox の機能の記録を扱う。worktree 側の進み具合は、`.worktrees/next/` の下の handoff.md を読んで `docs/progress.md` に写す
   - worktree 側の実装が済んだら、`git merge f-NN-<機能名>` で main に取り込む
 - **worktree 側**（`.worktrees/next/`。機能が変わっても同じディレクトリを使う）
-  - main で確認中の機能の、次の機能を実装する。仕様（人の承認。人が自分で書くかも確かめる）→ 実装 → テスト → commit
+  - main で確認中の機能の、次の機能を実装する。仕様（人の承認）→ 実装 → テスト → commit
   - `docs/features/f-NN-<機能名>/handoff.md` を書き、段が進むたびに直す（書き方は `.claude/rules/docs.md`）
   - main で確認中の機能の確認が済んだら、`git merge main` で取り込み、衝突を解き、main の変更と要件に合わせる。要れば実装をやり直す
   - 実装が済んだら、handoff.md の進み具合を「済んだ」にし、人に知らせる（取り込むのは main 側）

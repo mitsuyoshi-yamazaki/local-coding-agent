@@ -1,7 +1,7 @@
 # F-NN <機能の名前>
 
 - 機能: `docs/features.md` の F-NN
-- 書いた人: Claude Code が書き、人が読んだ／人が書いた
+- 書いた人: Claude Code が書き、人が読んだ
 - commit: <commit のハッシュ（複数なら全て）>
 
 ## 要件
