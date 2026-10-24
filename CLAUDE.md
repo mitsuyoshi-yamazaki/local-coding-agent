@@ -38,7 +38,7 @@
   - 実装が済んだら、handoff.md の進み具合を「済んだ」にし、人に知らせる（取り込むのは main 側）
   - inbox・outbox・`docs/progress.md` は扱わない（git に入っておらず、worktree には無い）。上流とのやりとりは main 側が行う
   - 実物のモデルで走らせない。試すのは main 側で人が行う
-  - 始めに、`which poetry` で poetry が見つかるかを確かめ、`poetry install`（人に確かめる）で worktree の `.venv/` を作る
+  - 始めに、`poetry install`（人に確かめる）で worktree の `.venv/` を作る。worktree の sandbox の中では `which poetry` が見つからないが、`poetry` は sandbox の外で走るので動く（F-02 の worktree で実測）
 - **次の機能へ**: main に取り込んだら、人が worktree で新しいセッションを始める。そのセッションは `git switch -c f-NN-<機能名> main` で新しい branch を作る。取り込み済みの古い branch を消すのは人である
 - **polish 側**（`.worktrees/polish/`・branch `polish`。同じ branch を使い続ける）
   - 作るエージェントのソフトウェア面を改善する。`polish` は main にも worktree 側の branch にも取り込まない（`git merge` は deny で止まる）
@@ -48,7 +48,7 @@
   - 人の問いには polish 側が答える（main 側は polish のコードを持たない）
   - inbox・outbox・`docs/progress.md` は扱わない。上流に上げたいことは、handoff.md の「main 側に頼むこと」に書く
   - 実物のモデルで走らせない。試すのは polish の worktree で人が行う
-  - 始めに、`which poetry` で poetry が見つかるかを確かめ、`poetry install`（人に確かめる）で worktree の `.venv/` を作る
+  - 始めに、`poetry install`（人に確かめる）で worktree の `.venv/` を作る。worktree の sandbox の中では `which poetry` が見つからないが、`poetry` は sandbox の外で走るので動く（F-02 の worktree で実測）
 
 ## Python の環境
 
