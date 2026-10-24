@@ -47,6 +47,7 @@
       "Bash(git branch -D *)",
       "Bash(git tag -d *)",
       "Bash(git worktree remove *)",
+      "Bash(git merge *polish*)",
       "Bash(poetry env remove *)",
       "Bash(uv tool *)",
       "Bash(pipx *)",

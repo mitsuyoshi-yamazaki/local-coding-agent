@@ -11,7 +11,7 @@ docs/progress.md
 # 一時ファイルの置き場
 .tmp/
 
-# 次の機能を実装する git worktree（.worktrees/next）
+# git worktree（.worktrees/next は次の機能の実装、.worktrees/polish はソフトウェア面の改善）
 .worktrees/
 
 # 走行の記録（機械が出す JSONL）
