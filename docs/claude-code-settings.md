@@ -14,6 +14,7 @@
 | `.claude/hooks/guard_paths.py` | リポジトリの外のファイルを編集する道具の呼び出しを拒む hook |
 | `.claude/rules/docs.md` | docs/ の書き方（docs/ の文書を読み書きすると読み込まれる） |
 | `.claude/skills/derive-settings/SKILL.md` | 要件から設定を書き起こす手順 |
+| `.claude/skills/feature-record/` | 機能の記録を書く手順と雛形 |
 | `pyproject.toml`・`poetry.toml` | Python の版・lint と型の検査の設定・仮想環境をリポジトリの中に作る設定 |
 | `.gitignore` | 仮想環境（`.venv/`）と一時ファイルの置き場（`.tmp/`）を git に入れない |
 
@@ -89,6 +90,14 @@
 
 手元の Ollama を呼ぶこと: sandbox は全てのドメインを拒むので、今は sandbox の中のコマンドから Ollama に届かない。作ったエージェントを実物のモデルで走らせるときの扱いは、上流で設計の途中である。
 
+### 実物のモデルで走らせるのは、許可の機能（F-06）ができるまで人だけ
+
+| 手段 | 設定 |
+|---|---|
+| sandbox | 上の `deniedDomains: ["*"]` で、sandbox の中のコマンド（作ったエージェント・`ollama` のコマンドを含む）は手元の Ollama にも届かない |
+
+止められない部分: 無いと見ている。ただし、手元の Ollama が入っていないので、届かないことは試していない。
+
 ### 環境変数と秘匿情報の読み取りの禁止
 
 | 手段 | 設定 |
@@ -123,9 +132,12 @@
 |---|---|
 | docs/ の書き方（規則は skill か rule にする） | rule（`.claude/rules/docs.md`） |
 | 誰が書くか（人が書くか、Claude Code が書くか） | CLAUDE.md（仕様を決めるときに確かめる） |
-| 機能ごとの記録の項目 | 要件（CLAUDE.md が読み込む） |
-| 受け渡し・commit するもの | CLAUDE.md |
-| lint と型の検査 | `pyproject.toml` の設定と、CLAUDE.md の「commit の前に走らせる」 |
+| 機能ごとの記録の項目と書き方 | skill `feature-record`（手順と雛形） |
+| 1機能の進め方・inbox と outbox の書式 | 要件（CLAUDE.md が読み込む） |
+| commit するもの | CLAUDE.md |
+| 走行の記録を git に入れない | `.gitignore` の `traces/` |
+| テスト・lint・型の検査 | `pyproject.toml` の設定と、CLAUDE.md の「commit の前に走らせる」 |
+| 1ファイル 200 行程度・関数 50 行まで | 要件（CLAUDE.md が読み込む）。lint では検査していない |
 | 要件を守っているかを確かめる lint | 無い |
 
 ## 止まるかを確かめた操作
