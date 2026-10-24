@@ -8,6 +8,13 @@
 - LLM の API は会話の状態を持たない。2回目の質問をするときは、1回目の質問と答えを含めた**履歴の全体**を毎回送る。履歴を持っているのは、API を呼ぶ側のプログラムである
 - モデルが一度に読める量には上限がある（文脈窓。トークン数で決まる）。履歴が長くなれば、いつか入りきらなくなる
 
+## 指示（system prompt）
+
+- 呼ぶ側のプログラムは、会話の先頭に、モデルへの指示を置く。これを system prompt と呼ぶ。役割・答え方・道具の使い方・守る規則などを書く
+- system prompt も、会話のほかの部分と同じく文である。手元でモデルを動かす Ollama は、指示と発言の並びを、モデルごとの雛形（テンプレート）で1つの文に組み立ててから、モデルに渡す。モデルは、指示を、入力の文の先頭の部分として読む
+- 指示は毎回の要求に入る。長い指示は、毎回の入力のトークン数を増やす
+- 指示の入り口は system prompt だけではない。Claude Code は、作業ディレクトリ・OS などの環境の知らせと、指示ファイル（CLAUDE.md）を、system prompt ではなく会話の中に入れる。system prompt を変わらない文に保ち、キャッシュ（前の要求で処理した部分の使い回し）を効かせるためである
+
 ## 道具の呼び出し
 
 LLM が出せるのは文だけで、自分ではファイルを読めず、コマンドも走らせられない。そこで、次の往復を行う。これを道具の呼び出し（tool use / function calling）と呼ぶ。
@@ -41,9 +48,12 @@ Claude Code の機能の多くはハーネスの側にある。だから、モ�
 
 ## 出典
 
-確かめた日は 2026-10-22。
+確かめた日は、断りが無ければ 2026-10-22。
 
 - How tool use works（Anthropic）: https://platform.claude.com/docs/en/agents-and-tools/tool-use/how-tool-use-works
 - Building effective agents（Anthropic）: https://www.anthropic.com/engineering/building-effective-agents
 - How Claude Code works: https://code.claude.com/docs/en/how-claude-code-works
 - How the agent loop works（Claude Agent SDK）: https://code.claude.com/docs/en/agent-sdk/agent-loop
+- Messages API（`system` は発言の並びとは別の引数。2026-10-24）: https://platform.claude.com/docs/en/api/messages
+- Modifying system prompts（Claude Code が環境の知らせと CLAUDE.md を会話の中に入れること。2026-10-24）: https://code.claude.com/docs/en/agent-sdk/modifying-system-prompts
+- Ollama の Modelfile（`TEMPLATE` は、モデルに渡す文の全体の雛形。2026-10-24）: https://docs.ollama.com/modelfile

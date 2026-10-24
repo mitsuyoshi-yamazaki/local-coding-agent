@@ -25,6 +25,12 @@ Ollama は3種類の口を持つ。同じモデルを、どの形でも呼べる
 | OpenAI 互換 | `/v1/chat/completions` など | OpenAI の API と同じ形 |
 | Anthropic 互換 | `/v1/messages` | Claude の API と同じ形（v0.14.0 から）。Claude Code をこの口につなぐこともできる。`tool_choice` などは使えない |
 
+## 指示（system prompt）の渡し方
+
+- `/api/chat` には system prompt の欄が無い。`messages` の中に、`role` が `system` の発言として入れる（[仕組み](../how-coding-agents-work.md#指示system-prompt)）
+- 発言が持つ欄は `role`・`content`・`images`・`tool_calls` で、送った時刻などのメタデータの欄は無い
+- Ollama は、`messages` を、モデルごとの雛形（Modelfile の `TEMPLATE`）で1つの文に組み立ててから、モデルに渡す。Modelfile の `SYSTEM` は、その雛形に入れる system の発言を決める
+
 ## 道具の呼び出しと推論
 
 - 道具の呼び出し（[仕組み](../how-coding-agents-work.md#道具の呼び出し)）: `/api/chat` の `tools` に道具の定義を渡すと、モデルが呼び出しを返す。道具の呼び出しを学習したモデルでないと使えない
@@ -53,6 +59,8 @@ Ollama は3種類の口を持つ。同じモデルを、どの形でも呼べる
 - Cloud（ollama.com の API と API キー。2026-10-23）: https://docs.ollama.com/cloud
 - macOS（必要な版・Apple M 系と Intel）: https://docs.ollama.com/macos
 - Context length（既定の文脈の長さ）: https://docs.ollama.com/context-length
+- Chat（発言の欄と、`role` の値。2026-10-24）: https://docs.ollama.com/api/chat
+- Modelfile（`TEMPLATE`・`SYSTEM`。2026-10-24）: https://docs.ollama.com/modelfile
 - Tool calling: https://docs.ollama.com/capabilities/tool-calling
 - Thinking（`think` の値と段階）: https://docs.ollama.com/capabilities/thinking
 - OpenAI compatibility: https://docs.ollama.com/api/openai-compatibility
