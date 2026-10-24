@@ -135,6 +135,7 @@
 | コードは常に Claude Code が書き、人が読む | 要件（CLAUDE.md が読み込む） |
 | 機能ごとの記録の項目と書き方 | skill `feature-record`（手順と雛形） |
 | 1機能の進め方・inbox と outbox の書式 | 要件（CLAUDE.md が読み込む） |
+| 持ち主が直接出した要件は、写しに先に書き、上流へ報告する | 要件（CLAUDE.md が読み込む）と CLAUDE.md（報告は main 側） |
 | commit するもの | CLAUDE.md |
 | README.md にセットアップ・起動・使い方を書き、機能を足すたびに直す | CLAUDE.md |
 | 作業の進行を `docs/progress.md` に記録し、常に更新する | CLAUDE.md と `.gitignore`（git に入れない）。docs/ の rule は当てない |

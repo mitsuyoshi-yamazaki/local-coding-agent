@@ -2,7 +2,7 @@
 
 このリポジトリで作業する Claude Code への指示である。
 
-- 要件は [docs/requirements.md](docs/requirements.md) にあり、下で読み込む。正本は上流のリポジトリ（非公開）にあり、変更は `docs/inbox/` で届く
+- 要件は [docs/requirements.md](docs/requirements.md) にあり、下で読み込む。正本は上流のリポジトリ（非公開）にあり、変更は `docs/inbox/` で届く。持ち主がこのリポジトリのセッションで直接出した要件は、先に写しに書き、outbox と SendMessage で上流へ報告する（main 側が行う）
 - この文書と Claude Code の設定（`.claude/`）は、要件から skill `derive-settings` で書き起こしたものである。要件と設定の対応と、設定では止められない部分は [docs/claude-code-settings.md](docs/claude-code-settings.md) にある
 - 要件が変わったとき・Claude Code の版が上がったとき・道具を足したときは、`derive-settings` で書き起こし直す（変更は持ち主の承認を得てから）
 - 返答の言語などの、持ち主の全プロジェクトに共通の規則は `~/.claude/rules/` にあり、ここにも効く
