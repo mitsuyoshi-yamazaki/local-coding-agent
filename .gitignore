@@ -8,6 +8,9 @@ docs/outbox/
 # 一時ファイルの置き場
 .tmp/
 
+# 走行の記録（機械が出す JSONL）
+traces/
+
 # Python
 __pycache__/
 *.py[cod]

@@ -25,16 +25,11 @@
 ## Python の環境
 
 - 仮想環境はリポジトリの中の `.venv/` にある。コードは `.venv/bin/python` で走らせる（`poetry run` は使わない）
-- commit の前に、lint と型の検査を通す: `.venv/bin/ruff check .`・`.venv/bin/ruff format --check .`・`.venv/bin/mypy`（検査する場所は `pyproject.toml` にある）
+- commit の前に、テストと lint と型の検査を通す: `.venv/bin/python -m unittest`・`.venv/bin/ruff check .`・`.venv/bin/ruff format --check .`・`.venv/bin/mypy`（mypy が検査する場所は `pyproject.toml` にある。コードの置き場を作ったら足す）
 
-## 進め方
+## 記録
 
-- 機能の仕様を決めるときに、その機能を人が自分で書くか、Claude Code が書くかを確かめる
-- 1機能の変更には、人が読む順の案内を付ける
-
-## 受け渡し
-
-- inbox のファイルを処理したら、outbox に報告を書き（inbox には印を付けられないため）、上流のセッションへ SendMessage で知らせる
+- 機能の記録は、skill `feature-record` の手順と雛形で書く
 
 ## 文書（docs/）
 
