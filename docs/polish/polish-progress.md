@@ -6,6 +6,7 @@ polish 側（branch `polish`）で行ったことと、main との差異の記�
 
 - 作業中の issue: 無い
 - 人を待っていること: main 側への変更の依頼（下の「main 側に頼むこと」）・`poetry install` で `.venv/` を作ること
+- `poetry install` と `poetry env use …python3.14` は、「Current Python version (3.6.5) is not allowed」で止まった（2026-10-24）。Poetry 2.5.1 は、`VIRTUAL_ENV`（または base でない conda の `CONDA_PREFIX`）があると「すでに仮想環境の中にいる」と見なし、in-project の `.venv` が無いときはその環境の版を検査する。polish のセッションが、Python 3.6.5 の環境が有効なまま起動されたと見ている（環境変数は読めないので確かめていない）。`poetry.toml` は `in-project = true` だけで、`virtualenvs.create = false` ではない。next の worktree では同じ設定で動き、`.venv` は `/usr/local/opt/python@3.14/bin/python3.14` で作られている
 
 ## main との差異
 
