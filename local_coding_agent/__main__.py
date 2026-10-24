@@ -10,6 +10,7 @@ from datetime import datetime
 from pathlib import Path
 
 from local_coding_agent.cli import repl
+from local_coding_agent.cli.user_input import bracketed_paste
 from local_coding_agent.context.environment import (
     collect_environment,
     environment_section,
@@ -89,7 +90,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         now=local_now,
         display=display_for(args, sys.stdout.isatty()),
     )
-    repl.run(session)
+    with bracketed_paste(sys.stdin, sys.stdout):
+        repl.run(session)
     return 0
 
 

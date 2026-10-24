@@ -104,6 +104,10 @@ class HistoryTest(unittest.TestCase):
         model, _, _ = run_repl(["", "   ", "a"], [[TextDelta("x"), STOP]])
         self.assertEqual(model.sent, [(user_text("a", at(0)),)])
 
+    def test_continued_lines_are_one_request(self) -> None:
+        model, _, _ = run_repl(["一行目\\", "二行目"], [[TextDelta("x"), STOP]])
+        self.assertEqual(model.sent, [(user_text("一行目\n二行目", at(0)),)])
+
 
 class SystemPromptAndMetadataTest(unittest.TestCase):
     def test_sends_same_system_prompt_every_turn(self) -> None:

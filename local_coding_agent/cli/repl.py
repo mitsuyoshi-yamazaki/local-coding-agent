@@ -1,4 +1,4 @@
-"""端末の REPL。依頼を1行ずつ受け、会話の全体をモデルに送り、応答を流して表示する。
+"""端末の REPL。依頼を1つずつ受け、会話の全体をモデルに送り、応答を流して表示する。
 
 モデルの API は会話の状態を持たないので、履歴はここで持ち、毎回、system prompt と会話の
 全体を送る。利用者の発言には、送った時刻を付ける。
@@ -11,6 +11,7 @@ from datetime import datetime
 from typing import Literal, TextIO
 
 from local_coding_agent.cli.screen import Screen
+from local_coding_agent.cli.user_input import read_request
 from local_coding_agent.model.chat import (
     ChatModel,
     ChatRequest,
@@ -80,7 +81,7 @@ def run(session: Session) -> None:
     turn = 0
     while True:
         try:
-            line = session.read_line(PROMPT)
+            line = read_request(session.read_line, PROMPT)
         except EOFError:
             session.output.write("\n")
             return
