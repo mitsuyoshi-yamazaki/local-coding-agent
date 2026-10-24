@@ -2,6 +2,7 @@
 paths:
   - "docs/*.md"
   - "docs/technologies/**/*.md"
+  - "docs/features/**/*.md"
 ---
 
 # docs/ の書き方
@@ -32,6 +33,16 @@ docs/ の説明の文書を書くときの規則である。受け渡しのフ�
 - 一般的なソフトウェアエンジニアが知っていることは書かない（例: HTTP の API とは何か・curl での呼び方）
 - その技術に固有のことと、このリポジトリでの使い方だけを、短く書く。例: 「「API で呼ぶ」とはどういうことか」を説明せず、「Ollama はローカルのサーバとして動く。ollama.com のサービスも同じ API で使える」と書く
 - 技術の文書を足したら、`docs/technologies/README.md` の一覧に足す
+
+## docs/features/
+
+- 機能ごとに、ディレクトリ `docs/features/f-NN-<機能名>/` を作る。`NN` は `docs/features.md` の番号（2桁。名前の順に並べると機能の順になる）。`<機能名>` は英小文字とハイフン
+- 中に置くもの:
+  - `spec.md`: 実装前の仕様（人が承認したもの）
+  - `implementation.md`: 実装した後の、実際に実装された仕様と仕組み
+  - `measurements.md`: 計測の結果（あれば）
+  - そのほか、その機能に関わる文書
+- `spec.md` は実装の前の仕様、`measurements.md` は計測した時点の結果として残す。この2つには、上の「経緯を書かない」を当てない。実装で仕様が変わったら、`spec.md` は直さず、`implementation.md` に書く
 
 ## 読む順
 
