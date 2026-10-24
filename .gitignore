@@ -5,6 +5,10 @@ docs/outbox/
 # 作業の進行の記録。手元だけ
 docs/progress.md
 
+# polish 側の課題の一覧。手元だけ
+docs/polish/issues-human.md
+docs/polish/issues-claude.md
+
 # 手元だけの Claude Code の設定
 .claude/settings.local.json
 

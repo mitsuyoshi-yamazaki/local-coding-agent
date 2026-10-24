@@ -45,9 +45,9 @@
   - 作るエージェントのソフトウェア面を改善する。`polish` は main にも worktree 側の branch にも取り込まない（`git merge` は deny で止まる）
   - 何を改善するかは人と決める（仕様の決定）。決めたら実装 → テスト → commit する。人が全てのコードを読むことと、1ファイル・関数の大きさの目安は前提にしない（要件の「進め方と記録」の polish 側の項）。依存を極力小さくすることなど、ほかの要件は当てる
   - セッションの始めに main が進んでいるかを確かめ、進んでいれば `git merge main` で取り込み、衝突を解き、改善を main の変更と要件に合わせる
-  - main から変えたこと・設計の選択と理由・セッションの間の引き継ぎを `docs/polish/handoff.md` に書き、改善するたびに直す（書き方は `.claude/rules/docs.md` の handoff.md に倣う）。`docs/features/` の文書は main の実装の説明なので直さない。使い方が変わったら README.md を直す
+  - 改善の進め方（課題の一覧・仕様・進行の記録）は、polish の branch にだけある `.claude/rules/polish.md` にある。main から変えたこと・セッションの間の引き継ぎは `docs/polish/polish-progress.md` に書く。`docs/features/` の文書は main の実装の説明なので直さない。使い方が変わったら README.md を直す
   - 人の問いには polish 側が答える（main 側は polish のコードを持たない）
-  - inbox・outbox は扱わない。`docs/progress.md` は main 側が置く写しで、読むだけにする。上流に上げたいことは、handoff.md の「main 側に頼むこと」に書く
+  - inbox・outbox は扱わない。`docs/progress.md` は main 側が置く写しで、読むだけにする。上流や main 側に上げたいことは、`docs/polish/polish-progress.md` の「main 側に頼むこと」に書き、人が main 側に伝える
   - 実物のモデルで走らせない。試すのは polish の worktree で人が行う
   - 始めに、`poetry install`（人に確かめる）で worktree の `.venv/` を作る。worktree の sandbox の中では `which poetry` が見つからないが、`poetry` は sandbox の外で走るので動く（F-02 の worktree で実測）
 
