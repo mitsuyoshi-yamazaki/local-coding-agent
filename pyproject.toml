@@ -17,4 +17,4 @@ dev = [
 [tool.mypy]
 strict = true
 # 検査する場所。コードの置き場を作ったら足す（"." は点で始まるディレクトリを辿らず、.py が無いと失敗する）
-files = [".claude/hooks"]
+files = ["local_coding_agent", "tests", ".claude/hooks"]
