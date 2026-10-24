@@ -22,6 +22,25 @@
 - 仕様の決定・CLAUDE.md や rule や skill や設定の変更・依存や道具の導入（`poetry` のコマンドを含む）
 - 自律的に行ってよいのは、機能の実装（テストと手元の commit を含む）・動作検証・docs/ の記載・outbox への記録である
 
+## main と worktree の分担
+
+実装の待ち時間をなくすため、2つのセッションで並べて進める。`git branch --show-current` が `main` なら main 側、それ以外（`f-NN-<機能名>`）なら worktree 側である。
+
+- **main 側**（リポジトリの根）
+  - 実装された機能の確認と実行（人が読む・試す）を行う。人の問いに答え、要ればコードを直して main に commit する
+  - 問いに答えるときは、その機能の `docs/features/f-NN-<機能名>/handoff.md` を読む。来た問いと答え・直したことを handoff.md に足す
+  - inbox・outbox・`docs/progress.md`・outbox の機能の記録を扱う。worktree 側の進み具合は、`.worktrees/next/` の下の handoff.md を読んで `docs/progress.md` に写す
+  - worktree 側の実装が済んだら、`git merge f-NN-<機能名>` で main に取り込む
+- **worktree 側**（`.worktrees/next/`。機能が変わっても同じディレクトリを使う）
+  - main で確認中の機能の、次の機能を実装する。仕様（人の承認。人が自分で書くかも確かめる）→ 実装 → テスト → commit
+  - `docs/features/f-NN-<機能名>/handoff.md` を書き、段が進むたびに直す（書き方は `.claude/rules/docs.md`）
+  - main で確認中の機能の確認が済んだら、`git merge main` で取り込み、衝突を解き、main の変更と要件に合わせる。要れば実装をやり直す
+  - 実装が済んだら、handoff.md の進み具合を「済んだ」にし、人に知らせる（取り込むのは main 側）
+  - inbox・outbox・`docs/progress.md` は扱わない（git に入っておらず、worktree には無い）。上流とのやりとりは main 側が行う
+  - 実物のモデルで走らせない。試すのは main 側で人が行う
+  - 始めに、`which poetry` で poetry が見つかるかを確かめ、`poetry install`（人に確かめる）で worktree の `.venv/` を作る
+- **次の機能へ**: main に取り込んだら、人が worktree で新しいセッションを始める。そのセッションは `git switch -c f-NN-<機能名> main` で新しい branch を作る。取り込み済みの古い branch を消すのは人である
+
 ## Python の環境
 
 - 仮想環境はリポジトリの中の `.venv/` にある。コードは `.venv/bin/python` で走らせる（`poetry run` は使わない）

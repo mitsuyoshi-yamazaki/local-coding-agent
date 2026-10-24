@@ -5,7 +5,7 @@ description: 機能を1つ作り終えたときに、outbox に機能の記録�
 
 # 機能の記録を書く
 
-機能ごとに1つ、`docs/outbox/F-NN-<題>.md` を書く。`NN` は `docs/features.md` の番号、`<題>` はその機能の短い名前（英小文字とハイフン）。例: `F-01-chat.md`。
+機能ごとに1つ、`docs/outbox/F-NN-<題>.md` を書く。書くのは main 側のセッションである（outbox は main 側にしか無い）。実装したのが worktree 側のセッションなら、実装の要点・設計の選択・読む順の案内（案）は、その機能の `docs/features/f-NN-<機能名>/handoff.md` から写す。`NN` は `docs/features.md` の番号、`<題>` はその機能の短い名前（英小文字とハイフン）。例: `F-01-chat.md`。
 
 記録は、後でブログにするときに書き足さずに済むように書く。公開できる文体である必要はない。
 

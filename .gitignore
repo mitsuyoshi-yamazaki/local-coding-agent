@@ -11,6 +11,9 @@ docs/progress.md
 # 一時ファイルの置き場
 .tmp/
 
+# 次の機能を実装する git worktree（.worktrees/next）
+.worktrees/
+
 # 走行の記録（機械が出す JSONL）
 traces/
 
