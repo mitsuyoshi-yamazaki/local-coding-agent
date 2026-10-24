@@ -191,6 +191,27 @@ class DebugDisplayTest(unittest.TestCase):
         self.assertNotIn(DIM, plain)
 
 
+class SeparationTest(unittest.TestCase):
+    def test_blank_lines_around_reply(self) -> None:
+        _, _, output = run_repl(
+            ["a", "b"], [[TextDelta("x"), STOP], [TextDelta("y\n"), STOP]]
+        )
+        numbers = (
+            "[入力 7 トークン・出力 2 トークン・最初の文字まで 0.50 秒・全体 1.00 秒]"
+        )
+        # 端末では、各回の最初の空行の前に、入力の行（> a）がある。最後の改行は Ctrl-D の後のもの
+        self.assertEqual(output, f"\nx\n{numbers}\n\n" + f"\ny\n{numbers}\n\n" + "\n")
+
+    def test_numbers_are_dim_but_error_is_not(self) -> None:
+        _, _, output = run_repl(
+            ["a", "b"],
+            [[TextDelta("x"), STOP], [ModelError("繋がらない")]],
+            repl.Display(color=True),
+        )
+        self.assertIn(f"x\n{DIM}[入力 7", output)
+        self.assertIn("\n\n誤り: 繋がらない（この回は履歴に足さない）\n\n", output)
+
+
 class BellTest(unittest.TestCase):
     def test_rings_after_reply_and_error_but_not_cancel(self) -> None:
         _, _, output = run_repl(

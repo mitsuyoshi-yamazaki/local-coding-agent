@@ -78,7 +78,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     system = build_system_prompt(instructions, environment_section(environment))
     trace = TraceWriter(trace_path(TRACE_DIRECTORY, datetime.now()))
     sys.stdout.write(f"走行の記録: {trace.path}\n")
-    sys.stdout.write(f"指示: {args.system_prompt_file or '既定'}\n")
+    sys.stdout.write(f"指示: {args.system_prompt_file or '既定'}\n\n")
     session = repl.Session(
         model=OllamaChat(host=args.host, model=args.model),
         system=system,

@@ -106,11 +106,15 @@ def run_turn(
         {"type": "request", "turn": turn, "url": request.url, "body": request.body}
     )
     screen = Screen(session.output, session.display.color)
+    # 入力と応答の間と、数値の行と次の入力の間に、空行を入れて区切る
+    screen.write("\n")
     outcome = receive(session, request, screen)
     session.trace.write(response_record(turn, outcome))
-    screen.line(summary(outcome))
+    # 誤りは目立たせるために薄くしない
+    screen.line(summary(outcome), "text" if outcome.status == "error" else "note")
     if session.display.bell and outcome.status != "cancelled":
         screen.bell()
+    screen.write("\n")
     if outcome.status != "done":
         return history
     return (*messages, assistant_text(outcome.text))
