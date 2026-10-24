@@ -6,7 +6,7 @@
 
 | 機能 | 文書 |
 |---|---|
-| F-01 | [f-01-chat-and-trace](features/f-01-chat-and-trace/spec.md) |
+| F-01 | [実装前の仕様](features/f-01-chat-and-trace/spec.md)・[実装した仕様と仕組み](features/f-01-chat-and-trace/implementation.md) |
 
 ## 第1部 中核
 
