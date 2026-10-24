@@ -170,6 +170,7 @@
 | Write で `/claude-guard-test.txt` | hook で止まった |
 | Python から `https://example.com` へ接続 | 許すドメインを空にしただけでは**止まらなかった**。`deniedDomains: ["*"]` を足して止まった（host is on the deny list） |
 | `git push --dry-run` | ask で人に確かめられた |
+| `git merge polish`（main 側。polish が main と同じ commit のときに試した） | deny で止まった |
 
 試していないもの: `mv`・`git restore` などの、上で試したものと同じ形の deny。`cd` と `poetry` の ask。
 
