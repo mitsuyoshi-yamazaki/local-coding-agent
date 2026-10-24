@@ -2,6 +2,9 @@
 docs/inbox/
 docs/outbox/
 
+# 作業の進行の記録。手元だけ
+docs/progress.md
+
 # 手元だけの Claude Code の設定
 .claude/settings.local.json
 
