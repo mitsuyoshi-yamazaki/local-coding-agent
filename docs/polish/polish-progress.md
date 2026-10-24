@@ -5,8 +5,8 @@ polish 側（branch `polish`）で行ったことと、main との差異の記�
 ## 現在の状況
 
 - 作業中の issue: 無い
-- 人を待っていること: main 側への変更の依頼（下の「main 側に頼むこと」）・`poetry install` で `.venv/` を作ること
-- `poetry install` と `poetry env use …python3.14` は、「Current Python version (3.6.5) is not allowed」で止まった（2026-10-24）。Poetry 2.5.1 は、`VIRTUAL_ENV`（または base でない conda の `CONDA_PREFIX`）があると「すでに仮想環境の中にいる」と見なし、in-project の `.venv` が無いときはその環境の版を検査する。polish のセッションが、Python 3.6.5 の環境が有効なまま起動されたと見ている（環境変数は読めないので確かめていない）。`poetry.toml` は `in-project = true` だけで、`virtualenvs.create = false` ではない。next の worktree では同じ設定で動き、`.venv` は `/usr/local/opt/python@3.14/bin/python3.14` で作られている
+- 人を待っていること: main 側への変更の依頼（下の「main 側に頼むこと」）
+- `.venv/` は Python 3.14.4 でできている。polish のセッションの中では `poetry` のコマンドが「Current Python version (3.6.5) is not allowed」で止まるので、`poetry` は持ち主が端末で走らせる（下の経過）
 
 ## main との差異
 
@@ -39,3 +39,8 @@ polish 側（branch `polish`）で行ったことと、main との差異の記�
 ### 2026-10-24
 
 - polish 側の進行を管理するファイル（issues-human.md・issues-claude.md・polish-progress.md・specs/）と `.claude/rules/polish.md` を足した。CLAUDE.md の polish 側の項で、handoff.md を指していた所を直した
+- `.venv/` を作った。`poetry install` は、セッションの中でも持ち主の端末でも、そのままでは止まった
+  - セッションの中: `poetry install`・`poetry env use …python3.14` が「Current Python version (3.6.5) is not allowed」で止まった。Poetry 2.5.1 は、`VIRTUAL_ENV`（または base でない conda の `CONDA_PREFIX`）があると「すでに仮想環境の中にいる」と見なし、in-project の `.venv` よりもその環境を優先する。polish のセッションのプロセスに、Python 3.6.5 の環境を指す変数があると見ている（環境変数は読めないので確かめていない。持ち主の端末では空だった）
+  - 持ち主の端末: `.venv` が無いので、Poetry が Python を探すために `python`（pyenv の shim）を走らせ、終了コード 127 で止まった
+  - 直し方: セッションで `/usr/local/opt/python@3.14/bin/python3.14 -m venv .venv` で `.venv` を先に作り（next の `.venv` と同じ Python）、持ち主が端末で `poetry install` を走らせた。`.venv` があると、Poetry は Python を探さずにそれを使う
+  - テスト45件・Ruff・Ruff の整形・mypy が通ることを確かめた
