@@ -34,6 +34,10 @@ Ollama は3種類の口を持つ。同じモデルを、どの形でも呼べる
 ## 道具の呼び出しと推論
 
 - 道具の呼び出し（[仕組み](../how-coding-agents-work.md#道具の呼び出し)）: `/api/chat` の `tools` に道具の定義を渡すと、モデルが呼び出しを返す。道具の呼び出しを学習したモデルでないと使えない
+  - 道具の定義は、`type` が `function` で、`function` に `name`・`description`・`parameters`（入力の形の JSON Schema）を持つ
+  - 呼び出しは、モデルの発言の `tool_calls` に入る。1つは、`id` と、`function` の `index`・`name`・`arguments` を持つ。`arguments` は文字列ではなく、JSON の object である
+  - 結果は、`role` が `tool` の発言で返す。道具の名前（`tool_name`）と呼び出しの id（`tool_call_id`）と、結果の文（`content`）を持つ。Claude の Messages API の `is_error` にあたる欄は無い
+  - ストリーミングでは、`tool_calls` は流れてくる断片のどれかに載る。全ての断片から集める
 - 推論（thinking）: 推論を学習したモデルは、答えの前に推論の文を生成する。Ollama は推論の文を本文と別の欄で返し、`think` で切り替える。gpt-oss は `think` に `low`・`medium`・`high` を渡して、推論の強さを選べる
 
 ## Apple Silicon の Mac での動き
@@ -61,7 +65,8 @@ Ollama は3種類の口を持つ。同じモデルを、どの形でも呼べる
 - Context length（既定の文脈の長さ）: https://docs.ollama.com/context-length
 - Chat（発言の欄と、`role` の値。2026-10-24）: https://docs.ollama.com/api/chat
 - Modelfile（`TEMPLATE`・`SYSTEM`。2026-10-24）: https://docs.ollama.com/modelfile
-- Tool calling: https://docs.ollama.com/capabilities/tool-calling
+- Tool calling（道具の定義と呼び出しと結果の形・ストリーミングでの集め方。2026-10-24）: https://docs.ollama.com/capabilities/tool-calling
+- API の型（発言の `tool_calls`・`tool_name`・`tool_call_id`、呼び出しの `id`・`index`・`arguments`。2026-10-24）: https://github.com/ollama/ollama/blob/main/api/types.go
 - Thinking（`think` の値と段階）: https://docs.ollama.com/capabilities/thinking
 - OpenAI compatibility: https://docs.ollama.com/api/openai-compatibility
 - Anthropic compatibility（対応・未対応の一覧）: https://docs.ollama.com/api/anthropic-compatibility ・ https://ollama.com/blog/claude
