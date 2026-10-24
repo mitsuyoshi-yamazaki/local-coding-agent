@@ -44,3 +44,7 @@ polish 側（branch `polish`）で行ったことと、main との差異の記�
   - 持ち主の端末: `.venv` が無いので、Poetry が Python を探すために `python`（pyenv の shim）を走らせ、終了コード 127 で止まった
   - 直し方: セッションで `/usr/local/opt/python@3.14/bin/python3.14 -m venv .venv` で `.venv` を先に作り（next の `.venv` と同じ Python）、持ち主が端末で `poetry install` を走らせた。`.venv` があると、Poetry は Python を探さずにそれを使う
   - テスト45件・Ruff・Ruff の整形・mypy が通ることを確かめた
+
+### 2026-10-25
+
+- 持ち主の指示で、issues-human.md は人が `--` より下に箇条書きで書き、番号と題は Claude Code が取り出す前に振る形にした（`.claude/rules/polish.md`）
