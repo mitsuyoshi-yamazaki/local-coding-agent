@@ -144,3 +144,16 @@ F-02 は、F-01 のファイル（`model/messages.py`・`model/chat.py`・`model
 ## 問いと答えの記録
 
 main 側のセッションが、人から来た問いと答え・直したことを足す。
+
+### 2026-10-24〜25（F-02 を取り込んだ main のセッション）
+
+- **問い: どう試し、どの順で読むか（F-01 の変更点を含む）**
+  - 答え: 試し方は spec.md の「試し方」の 1.〜3. に、指示のファイルが無いときの誤り（終了コード 2・記録を作らない）を足した4つ。読む順は、この引き継ぎの「読む順の案内（案）」に、先に implementation.md の「モデルに届く文」を地図として読むことを足した。F-01 のファイルは `git diff fe319a2..main -- <ファイル>` で差分だけを読むよう案内した
+- **直したこと: 実験で使う手元のファイルの置き場 `experiments/`**（持ち主の指示。`1604ede`）
+  - `.gitignore` に足し、README の場所の表に足した。中身は git に入らないので、worktree や clone の先には無い
+  - 持ち主の指示で、system prompt の例を置いた（git に入っていない）: `role-only.md`（役割の1行だけ）・`without-harness-section.md`（「ハーネスが入れる情報」の節を除いた）・`english.md`（既定の指示の英訳）・`fake-tools.md`（道具を持たないのに「持つ」と書く）・`conflict-language.md`（「頼まれても英語で答える」）。どれも既定の指示から1か所だけを変えた。見るところは `experiments/README.md`
+- **問い: Ollama 側のログ（届いた要求・返した応答・処理の中身）を見られるか**
+  - 答え: 見られる。ただし、ログ（macOS のアプリでは `~/.ollama/logs/server.log`）も、詳しくする設定（`OLLAMA_DEBUG`。アプリでは `launchctl setenv` してアプリを起動し直す）もリポジトリの外なので、持ち主が行う。Claude Code に読ませるときは、持ち主が抜粋を `experiments/` に写す
+  - 届いた要求と返した応答の中身は、F-01 の走行の記録（要求の `body` と、応答の本文・`model_stats`）に既にある。server.log で新しく分かるのは、Ollama の中の処理（モデルの読み込み・雛形で組み立てた後の文・前の計算の使い回しなど）である
+  - 確かめたこと（2026-10-25）: `OLLAMA_DEBUG=1` で debug、`2` で trace の段になる（Ollama の `envconfig/config.go`）。今の main の `server/routes.go` の `ChatHandler` は、trace の段で `builtin parser input`・`builtin parser output` を出す（モデルが出した生の文と、本文・thinking・道具の呼び出しに分けた後の形）
+  - 確かめていないこと: 雛形で組み立てた後の文（prompt）がログに出るか。今の main の `server/routes.go` には、それを出す行が見つからなかった。Ollama の main はモデルを走らせる部分が変わっており（`runner/` が無く、`llm/server.go` に `using llama-server for model` の行がある）、前の計算の使い回しがログに出るかも分からない。手元の版で、持ち主が試して確かめる
