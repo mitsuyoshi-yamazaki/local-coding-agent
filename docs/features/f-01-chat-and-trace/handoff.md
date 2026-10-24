@@ -6,7 +6,7 @@ F-01 は、worktree の運用を始める前に、main のセッションが仕�
 
 ## 進み具合
 
-- 段: 実装が済み、人がコードを読んでいる（2026-10-24）。試すのは、人が Ollama を入れてモデルを取り込んでから
+- 段: 人がコードを読み終え、実物のモデルで動かして、会話の履歴をもとに返答していることを確かめた（2026-10-24）。そのあと、壊れた JSON の行の扱いを直した（下の「問いと答えの記録」）
 - branch: `main`
 - commit: `5aedc79`（コードとテスト）・`08278a9`（`implementation.md`）・`30625e3`（README）
 - テスト: 19件が通る。Ruff・mypy（strict）も通る
@@ -96,7 +96,7 @@ F-01 は、worktree の運用を始める前に、main のセッションが仕�
 
 ## 分かっている問題・残したこと
 
-- **壊れた JSON の行**: `read_stream` の `json.loads` が `json.JSONDecodeError` を投げると、`ModelError` ではないので REPL が落ちる。Ollama が壊れた行を返すことは考えにくいが、`ModelError` に変えるのが正しい。人が読み終えてから直すか決める
+- **壊れた JSON の行**（直した）: `read_stream` の `json.loads` が `json.JSONDecodeError` を投げると、`ModelError` ではないので REPL が落ちていた。`ModelError` に変えた（下の「問いと答えの記録」）
 - **thinking を捨てている**: Qwen3.5 などの推論をするモデルは、`think` を指定しないときも推論の文を `message.thinking` で返すことがある（Ollama の版とモデルによる）。F-01 は `message.content` しか見ないので、推論の間は何も表示されず、最初の文字までの時間が長く見える。F-09 で扱う
 - **時間切れが無い**: `urlopen` に timeout を渡していない。モデルの読み込みが長いことがあるため。Ollama が応答しないまま止まると、Ctrl-C で止めるしかない
 - **proxy の環境変数**: `urllib` は `HTTP_PROXY` などの環境変数を読む。人の環境で proxy が設定されていると、`localhost` への要求が proxy に向かうことがある（`NO_PROXY` で避ける）。試していない
@@ -112,4 +112,9 @@ F-01 は、worktree の運用を始める前に、main のセッションが仕�
 
 main 側のセッションが、人から来た問いと答え・直したことを足す。
 
-（まだ無い）
+### 2026-10-24 壊れた JSON の行を直した
+
+- 人の言葉: 「F-1の内容を読み、また動作させて、会話の履歴をもとに返答が行われていることを確認した」「F-01 で見つけた問題 — 修正せよ」
+- 直したこと: `model/ollama.py` の `read_stream` で、`json.loads` の `json.JSONDecodeError` を捕まえ、`ModelError("応答の行が JSON として読めない: …")` に変えた。REPL では、ほかの誤りと同じく、表示して履歴に足さない
+- テスト: `tests/test_ollama.py` の `test_broken_json_line_raises_model_error`（断片の後に途中で切れた行）。直す前に落ちることを確かめてから直した。テストは20件
+- 文書: `implementation.md` の「実装前の仕様との違い」に行を足した
