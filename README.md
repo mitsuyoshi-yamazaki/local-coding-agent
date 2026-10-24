@@ -9,6 +9,7 @@
 | 機能 | できること |
 |---|---|
 | [F-01 チャットと走行の記録](docs/features/f-01-chat-and-trace/implementation.md) | 端末で依頼を打つと、手元のモデルの応答を流しながら表示する。毎回、会話の全体を送る。要求と応答・トークン数・時間を記録する |
+| [F-02 system prompt と環境の知らせ](docs/features/f-02-system-prompt/implementation.md) | 毎回の要求の先頭に、モデルへの指示（system prompt）と、作業ディレクトリ・git のリポジトリの中か・OS の知らせを入れる。利用者の発言には、送った時刻を付ける。指示はファイルで差し替えられる |
 
 まだ、ファイルを読む・書く・コマンドを走らせるといった道具は使えない（[作る機能](docs/features.md) の F-03 から）。
 
@@ -63,6 +64,7 @@ ollama pull gpt-oss:20b
 |---|---|
 | `--model` | Ollama のモデルの名前。必須 |
 | `--host` | Ollama の URL。既定は `http://localhost:11434` |
+| `--system-prompt-file` | 指示の部分を、このファイルの中身（UTF-8）に差し替える。作業ディレクトリなどの環境の節は残る。無ければ既定の指示を使う |
 
 ## 使い方
 
@@ -70,6 +72,7 @@ ollama pull gpt-oss:20b
 
 ```text
 走行の記録: traces/20261024-153012.jsonl
+指示: 既定
 > 私は山田です
 はい、山田さん。
 [入力 12 トークン・出力 5 トークン・最初の文字まで 0.81 秒・全体 1.20 秒]
@@ -82,7 +85,8 @@ ollama pull gpt-oss:20b
 - `> ` に依頼を1行打ち、Enter で送る。応答は届いたそばから表示され、終わると数値の1行が出る
 - **応答の途中で Ctrl-C**: その回の応答を止める。止めた回の依頼と応答は、次の回に送る会話に入らない
 - **Ctrl-D**: 終える
-- **走行の記録**: 起動ごとに1つ、`traces/<起動の時刻>.jsonl` に書かれる。1行に1件で、送った JSON の全体と、受けた応答・トークン数・時間が入る。中身の欄は [F-01 の文書](docs/features/f-01-chat-and-trace/implementation.md#走行の記録) にある
+- **走行の記録**: 起動ごとに1つ、`traces/<起動の時刻>.jsonl` に書かれる。1行に1件で、送った JSON の全体と、受けた応答・トークン数・時間が入る。中身の欄は [F-01 の文書](docs/features/f-01-chat-and-trace/implementation.md#走行の記録) にある。送った JSON には、system prompt と、送った時刻を入れた発言が、モデルに渡した形のまま入る
+- **指示の差し替え**: 指示の長さで答えがどう変わるかを試すための指示のファイルが、`tasks/f-02-system-prompt/` にある（`short.md`・`long.md`）。指示を送らないときは `--system-prompt-file /dev/null` を渡す。中身は [F-02 の文書](docs/features/f-02-system-prompt/implementation.md#試すための指示のファイル) にある
 
 ## 開発
 
@@ -97,5 +101,6 @@ ollama pull gpt-oss:20b
 |---|---|
 | `local_coding_agent/` | エージェントのコード |
 | `tests/` | テスト（標準ライブラリの `unittest`） |
+| `tasks/` | 実物のモデルで試すための材料 |
 | `docs/` | 仕組みの説明・作る機能・要件 |
 | `traces/` | 走行の記録（git に入れない） |

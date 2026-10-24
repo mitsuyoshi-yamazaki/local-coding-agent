@@ -1,6 +1,7 @@
 """テストで使う偽物。実物のモデルにも、通信にも繋がない。"""
 
 from collections.abc import Callable, Iterator, Mapping, Sequence
+from datetime import datetime, timedelta
 
 from local_coding_agent.model.chat import ChatRequest, StreamEvent
 from local_coding_agent.model.messages import Message
@@ -10,13 +11,15 @@ type Step = StreamEvent | BaseException
 
 
 class ScriptedModel:
-    """決めた台本どおりに応答を返す、偽物のモデル。送られた会話を全て覚えておく。"""
+    """決めた台本どおりに応答を返す、偽物のモデル。送られた system prompt と会話を全て覚えておく。"""
 
     def __init__(self, script: Sequence[Sequence[Step]]) -> None:
         self.script = script
+        self.systems: list[str] = []
         self.sent: list[tuple[Message, ...]] = []
 
-    def build_request(self, messages: Sequence[Message]) -> ChatRequest:
+    def build_request(self, system: str, messages: Sequence[Message]) -> ChatRequest:
+        self.systems.append(system)
         self.sent.append(tuple(messages))
         return ChatRequest(url="http://fake/api/chat", body={"turn": len(self.sent)})
 
@@ -54,3 +57,11 @@ def ticking_clock(step: float = 0.5) -> Callable[[], float]:
     """呼ぶたびに step 秒ずつ進む、偽物の時計。"""
     ticks = iter(range(10_000))
     return lambda: next(ticks) * step
+
+
+def ticking_now(
+    start: datetime, step: timedelta = timedelta(minutes=1)
+) -> Callable[[], datetime]:
+    """呼ぶたびに step ずつ進む、偽物の今の時刻。"""
+    ticks = iter(range(10_000))
+    return lambda: start + next(ticks) * step

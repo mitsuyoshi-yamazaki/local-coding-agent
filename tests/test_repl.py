@@ -1,5 +1,6 @@
 import io
 import unittest
+from datetime import datetime, timedelta, timezone
 
 from local_coding_agent.cli import repl
 from local_coding_agent.model.chat import Done, ModelError, TextDelta
@@ -10,9 +11,16 @@ from tests.fakes import (
     Step,
     scripted_lines,
     ticking_clock,
+    ticking_now,
 )
 
 STOP = Done(done_reason="stop", stats={"prompt_eval_count": 7, "eval_count": 2})
+START = datetime(2026, 10, 24, 15, 30, tzinfo=timezone(timedelta(hours=9)))
+
+
+def at(minutes: int) -> datetime:
+    """偽物の今の時刻で、START から minutes 分の後。偽物は1回呼ぶごとに1分進む。"""
+    return START + timedelta(minutes=minutes)
 
 
 def run_repl(
@@ -24,10 +32,12 @@ def run_repl(
     output = io.StringIO()
     session = repl.Session(
         model=model,
+        system="指示",
         read_line=scripted_lines(*lines),
         output=output,
         trace=trace,
         clock=ticking_clock(),
+        now=ticking_now(START),
     )
     repl.run(session)
     return model, trace, output.getvalue()
@@ -42,13 +52,13 @@ class HistoryTest(unittest.TestCase):
                 [TextDelta("山田さん"), STOP],
             ],
         )
-        self.assertEqual(model.sent[0], (user_text("私は山田です"),))
+        self.assertEqual(model.sent[0], (user_text("私は山田です", at(0)),))
         self.assertEqual(
             model.sent[1],
             (
-                user_text("私は山田です"),
+                user_text("私は山田です", at(0)),
                 assistant_text("はい、山田さん。"),
-                user_text("私の名前は？"),
+                user_text("私の名前は？", at(1)),
             ),
         )
 
@@ -57,7 +67,7 @@ class HistoryTest(unittest.TestCase):
             ["長い話をして", "短く"],
             [[TextDelta("昔々"), KeyboardInterrupt()], [TextDelta("はい"), STOP]],
         )
-        self.assertEqual(model.sent[1], (user_text("短く"),))
+        self.assertEqual(model.sent[1], (user_text("短く", at(1)),))
         self.assertEqual(trace.records[1]["status"], "cancelled")
         self.assertEqual(trace.records[1]["text"], "昔々")
         self.assertIn("止めた", output)
@@ -67,7 +77,7 @@ class HistoryTest(unittest.TestCase):
             ["こんにちは", "もう一度"],
             [[ModelError("Ollama に繋がらない")], [TextDelta("はい"), STOP]],
         )
-        self.assertEqual(model.sent[1], (user_text("もう一度"),))
+        self.assertEqual(model.sent[1], (user_text("もう一度", at(1)),))
         self.assertEqual(trace.records[1]["status"], "error")
         self.assertIn("誤り: Ollama に繋がらない", output)
 
@@ -75,12 +85,29 @@ class HistoryTest(unittest.TestCase):
         model, trace, _ = run_repl(
             ["a", "b"], [[TextDelta("途中")], [TextDelta("はい"), STOP]]
         )
-        self.assertEqual(model.sent[1], (user_text("b"),))
+        self.assertEqual(model.sent[1], (user_text("b", at(1)),))
         self.assertEqual(trace.records[1]["status"], "error")
 
     def test_blank_lines_are_skipped(self) -> None:
         model, _, _ = run_repl(["", "   ", "a"], [[TextDelta("x"), STOP]])
-        self.assertEqual(model.sent, [(user_text("a"),)])
+        self.assertEqual(model.sent, [(user_text("a", at(0)),)])
+
+
+class SystemPromptAndMetadataTest(unittest.TestCase):
+    def test_sends_same_system_prompt_every_turn(self) -> None:
+        model, _, _ = run_repl(
+            ["a", "b"], [[TextDelta("x"), STOP], [TextDelta("y"), STOP]]
+        )
+        self.assertEqual(model.systems, ["指示", "指示"])
+
+    def test_messages_keep_the_time_they_were_sent(self) -> None:
+        model, _, _ = run_repl(
+            ["a", "b"], [[TextDelta("x"), STOP], [TextDelta("y"), STOP]]
+        )
+        first, reply, second = model.sent[1]
+        self.assertEqual(first.sent_at, at(0))
+        self.assertIsNone(reply.sent_at)
+        self.assertEqual(second.sent_at, at(1))
 
 
 class OutputAndTraceTest(unittest.TestCase):

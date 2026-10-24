@@ -43,8 +43,11 @@ type StreamEvent = TextDelta | Done
 class ChatModel(Protocol):
     """会話を送り、応答を流して受け取る相手。"""
 
-    def build_request(self, messages: Sequence[Message]) -> ChatRequest:
-        """会話の全体から、送る要求を作る。"""
+    def build_request(self, system: str, messages: Sequence[Message]) -> ChatRequest:
+        """system prompt と会話の全体から、送る要求を作る。
+
+        Messages API と同じく、system prompt は発言の並びとは別に渡す。空なら送らない。
+        """
         ...
 
     def stream(self, request: ChatRequest) -> Iterator[StreamEvent]:

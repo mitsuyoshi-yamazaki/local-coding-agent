@@ -1,7 +1,7 @@
 """Ollama の独自の API（/api/chat）との接続。
 
-会話の形（model/messages.py）を、送る直前に /api/chat の形へ変える。応答は NDJSON
-（1行に1つの JSON）で流れてくるので、1行ずつ読んで本文の断片と終わりの知らせに変える。
+system prompt と会話の形（model/messages.py）を、送る直前に /api/chat の形へ変える。応答は
+NDJSON（1行に1つの JSON）で流れてくるので、1行ずつ読んで本文の断片と終わりの知らせに変える。
 """
 
 import json
@@ -17,7 +17,7 @@ from local_coding_agent.model.chat import (
     StreamEvent,
     TextDelta,
 )
-from local_coding_agent.model.messages import Message
+from local_coding_agent.model.messages import Message, metadata_text
 
 # 最後の行（done が true）に載る、モデルの側が数えたトークン数と時間（時間はナノ秒）
 STAT_KEYS = (
@@ -30,19 +30,30 @@ STAT_KEYS = (
 )
 
 
-def to_ollama_messages(messages: Sequence[Message]) -> list[dict[str, str]]:
-    """会話を /api/chat の messages に変える。本文の塊を、つないで1つの文字列にする。"""
-    return [
-        {"role": message.role, "content": "".join(b.text for b in message.content)}
-        for message in messages
-    ]
+def to_ollama_messages(
+    system: str, messages: Sequence[Message]
+) -> list[dict[str, str]]:
+    """system prompt と会話を、/api/chat の messages に変える。
+
+    /api/chat には system prompt の欄が無いので、先頭の system の発言にする（空なら入れない）。
+    発言ごとに、メタデータの文と本文の塊を、つないで1つの文字列にする。
+    """
+    head = [{"role": "system", "content": system}] if system else []
+    return [*head, *(_ollama_message(message) for message in messages)]
 
 
-def chat_request_body(model: str, messages: Sequence[Message]) -> dict[str, object]:
+def _ollama_message(message: Message) -> dict[str, str]:
+    text = "".join(block.text for block in message.content)
+    return {"role": message.role, "content": metadata_text(message) + text}
+
+
+def chat_request_body(
+    model: str, system: str, messages: Sequence[Message]
+) -> dict[str, object]:
     """/api/chat へ送る JSON の全体を作る。"""
     return {
         "model": model,
-        "messages": to_ollama_messages(messages),
+        "messages": to_ollama_messages(system, messages),
         "stream": True,
     }
 
@@ -101,10 +112,10 @@ class OllamaChat:
     host: str
     model: str
 
-    def build_request(self, messages: Sequence[Message]) -> ChatRequest:
+    def build_request(self, system: str, messages: Sequence[Message]) -> ChatRequest:
         return ChatRequest(
             url=f"{self.host.rstrip('/')}/api/chat",
-            body=chat_request_body(self.model, messages),
+            body=chat_request_body(self.model, system, messages),
         )
 
     def stream(self, request: ChatRequest) -> Iterator[StreamEvent]:

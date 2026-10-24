@@ -1,10 +1,12 @@
 """端末の REPL。依頼を1行ずつ受け、会話の全体をモデルに送り、応答を流して表示する。
 
-モデルの API は会話の状態を持たないので、履歴はここで持ち、毎回その全体を送る。
+モデルの API は会話の状態を持たないので、履歴はここで持ち、毎回、system prompt と会話の
+全体を送る。利用者の発言には、送った時刻を付ける。
 """
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Literal, TextIO
 
 from local_coding_agent.model.chat import (
@@ -27,10 +29,15 @@ class Session:
     """REPL が使うもの。テストでは偽物に差し替える。"""
 
     model: ChatModel
+    # 起動のときに組み立てた system prompt。会話の間は変えない
+    system: str
     read_line: Callable[[str], str]
     output: TextIO
     trace: TraceSink
+    # 時間を測る時計（秒）
     clock: Callable[[], float]
+    # 発言に付ける、今の時刻（時差つき）
+    now: Callable[[], datetime]
 
 
 @dataclass(frozen=True)
@@ -71,8 +78,8 @@ def run_turn(
 
     止めた回と誤りの回は履歴に足さず、元の履歴を返す。
     """
-    messages = (*history, user_text(text))
-    request = session.model.build_request(messages)
+    messages = (*history, user_text(text, sent_at=session.now()))
+    request = session.model.build_request(session.system, messages)
     session.trace.write(
         {"type": "request", "turn": turn, "url": request.url, "body": request.body}
     )
