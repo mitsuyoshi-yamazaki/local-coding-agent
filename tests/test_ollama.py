@@ -106,6 +106,16 @@ class ReadStreamTest(unittest.TestCase):
         with self.assertRaises(ModelError):
             list(read_stream(ndjson("[1, 2]")))
 
+    def test_broken_json_line_raises_model_error(self) -> None:
+        body = ndjson(
+            '{"message": {"content": "途中"}, "done": false}',
+            '{"message": {"content": "切れ',
+        )
+        events = read_stream(body)
+        self.assertEqual(next(events), TextDelta("途中"))
+        with self.assertRaisesRegex(ModelError, "JSON として読めない"):
+            next(events)
+
 
 class HttpErrorMessageTest(unittest.TestCase):
     def test_reads_error_field(self) -> None:

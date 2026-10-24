@@ -50,12 +50,15 @@ def chat_request_body(model: str, messages: Sequence[Message]) -> dict[str, obje
 def read_stream(lines: Iterable[bytes]) -> Iterator[StreamEvent]:
     """NDJSON の行を読み、本文の断片と、終わりの知らせに変える。
 
-    途中で error の行が届いたら ModelError を投げる。
+    途中で error の行や、JSON として読めない行が届いたら ModelError を投げる。
     """
     for raw in lines:
         if not raw.strip():
             continue
-        event = json.loads(raw)
+        try:
+            event = json.loads(raw)
+        except json.JSONDecodeError as error:
+            raise ModelError(f"応答の行が JSON として読めない: {raw!r}") from error
         if not isinstance(event, dict):
             raise ModelError(f"応答の行が JSON の object ではない: {raw!r}")
         if "error" in event:
