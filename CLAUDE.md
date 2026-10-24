@@ -30,13 +30,14 @@
   - 実装された機能の確認と実行（人が読む・試す）を行う。人の問いに答え、要ればコードを直して main に commit する
   - 問いに答えるときは、その機能の `docs/features/f-NN-<機能名>/handoff.md` を読む。来た問いと答え・直したことを handoff.md に足す
   - inbox・outbox・`docs/progress.md`・outbox の機能の記録を扱う。worktree 側の進み具合は、`.worktrees/next/` の下の handoff.md を読んで `docs/progress.md` に写す。polish 側の進み具合も、`.worktrees/polish/docs/polish/handoff.md` を読んで写す
+  - `docs/progress.md` を書き直したら、`cp docs/progress.md .worktrees/next/docs/progress.md` と `cp docs/progress.md .worktrees/polish/docs/progress.md` で、worktree 側と polish 側へ写しを置く（写しも `.gitignore` で git に入らない）
   - worktree 側の実装が済んだら、`git merge f-NN-<機能名>` で main に取り込む。`polish` は取り込まない
 - **worktree 側**（`.worktrees/next/`。機能が変わっても同じディレクトリを使う）
   - main で確認中の機能の、次の機能を実装する。仕様（人の承認）→ 実装 → テスト → commit
   - `docs/features/f-NN-<機能名>/handoff.md` を書き、段が進むたびに直す（書き方は `.claude/rules/docs.md`）
   - main で確認中の機能の確認が済んだら、`git merge main` で取り込み、衝突を解き、main の変更と要件に合わせる。要れば実装をやり直す
   - 実装が済んだら、handoff.md の進み具合を「済んだ」にし、人に知らせる（取り込むのは main 側）
-  - inbox・outbox・`docs/progress.md` は扱わない（git に入っておらず、worktree には無い）。上流とのやりとりは main 側が行う
+  - inbox・outbox は扱わない（git に入っておらず、worktree には無い）。`docs/progress.md` は main 側が置く写しで、読むだけにする（直しても、main 側が次に写すときに上書きされる）。上流とのやりとりは main 側が行う
   - 実物のモデルで走らせない。試すのは main 側で人が行う
   - 始めに、`poetry install`（人に確かめる）で worktree の `.venv/` を作る。worktree の sandbox の中では `which poetry` が見つからないが、`poetry` は sandbox の外で走るので動く（F-02 の worktree で実測）
 - **次の機能へ**: main に取り込んだら、人が worktree で新しいセッションを始める。そのセッションは `git switch -c f-NN-<機能名> main` で新しい branch を作る。取り込み済みの古い branch を消すのは人である
@@ -46,7 +47,7 @@
   - セッションの始めに main が進んでいるかを確かめ、進んでいれば `git merge main` で取り込み、衝突を解き、改善を main の変更と要件に合わせる
   - main から変えたこと・設計の選択と理由・セッションの間の引き継ぎを `docs/polish/handoff.md` に書き、改善するたびに直す（書き方は `.claude/rules/docs.md` の handoff.md に倣う）。`docs/features/` の文書は main の実装の説明なので直さない。使い方が変わったら README.md を直す
   - 人の問いには polish 側が答える（main 側は polish のコードを持たない）
-  - inbox・outbox・`docs/progress.md` は扱わない。上流に上げたいことは、handoff.md の「main 側に頼むこと」に書く
+  - inbox・outbox は扱わない。`docs/progress.md` は main 側が置く写しで、読むだけにする。上流に上げたいことは、handoff.md の「main 側に頼むこと」に書く
   - 実物のモデルで走らせない。試すのは polish の worktree で人が行う
   - 始めに、`poetry install`（人に確かめる）で worktree の `.venv/` を作る。worktree の sandbox の中では `which poetry` が見つからないが、`poetry` は sandbox の外で走るので動く（F-02 の worktree で実測）
 
@@ -58,7 +59,7 @@
 ## 記録
 
 - 機能の記録は、skill `feature-record` の手順と雛形で書く
-- 作業の進行は `docs/progress.md`（git に入れない）に書く。セッションの始めにまず読む。次のときに「現在の状況」と「機能ごとの段」を書き直し、「経過」に足す
+- 作業の進行は、main 側が `docs/progress.md`（git に入れない）に書く。どの側のセッションも、始めにまず読む（worktree 側と polish 側は写しを読む）。main 側は、次のときに「現在の状況」と「機能ごとの段」を書き直し、「経過」に足す
   - 機能の段（仕様・実装・読む・試す・記録）が変わったとき
   - 人や上流を待つことが変わったとき（増えた・済んだ）
   - inbox を処理したとき

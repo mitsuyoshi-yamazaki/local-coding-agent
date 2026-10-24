@@ -138,7 +138,7 @@
 | 持ち主が直接出した要件は、写しに先に書き、上流へ報告する | 要件（CLAUDE.md が読み込む）と CLAUDE.md（報告は main 側） |
 | commit するもの | CLAUDE.md |
 | README.md にセットアップ・起動・使い方を書き、機能を足すたびに直す | CLAUDE.md |
-| 作業の進行を `docs/progress.md` に記録し、常に更新する | CLAUDE.md と `.gitignore`（git に入れない）。docs/ の rule は当てない |
+| 作業の進行を `docs/progress.md` に記録し、常に更新する（扱うのは main 側だけ） | CLAUDE.md と `.gitignore`（git に入れない）。docs/ の rule は当てない。worktree 側と polish 側のセッションは main 側のファイルを読めないので（下の行）、main 側が書き直すたびに各 worktree へ写しを置き、worktree 側は読むだけにする（CLAUDE.md の指示だけ）。写しも、worktree の `.gitignore` で git に入らない |
 | main 側で確認し、git worktree（`.worktrees/next`）で次の機能を実装する | CLAUDE.md（分担）と `.gitignore`（`.worktrees/`）。worktree 側のセッションは、作業ディレクトリが worktree なので、`blockReadsOutsideWorkingDirectories` と sandbox で main 側のファイルを読めず、hook で worktree の外を編集できない |
 | git worktree（`.worktrees/polish`・branch `polish`）で、作るエージェントのソフトウェア面を改善する。polish は main へマージせず、main を polish へ一方的にマージする | CLAUDE.md（分担）・`.gitignore`（`.worktrees/`）・deny の `Bash(git merge *polish*)`（main と worktree 側で polish を取り込まない） |
 | 実装したセッションから、問いに答えるセッションへの引き継ぎ（`handoff.md`） | rule（`.claude/rules/docs.md`）と CLAUDE.md |
