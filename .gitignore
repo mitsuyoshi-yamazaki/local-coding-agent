@@ -21,6 +21,9 @@ docs/polish/issues-claude.md
 # 走行の記録（機械が出す JSONL）
 traces/
 
+# 人が実験で使うファイル（指示のファイルなど）。手元だけ
+experiments/
+
 # Python
 __pycache__/
 *.py[cod]

@@ -29,7 +29,7 @@
 - **main 側**（リポジトリの根）
   - 実装された機能の確認と実行（人が読む・試す）を行う。人の問いに答え、要ればコードを直して main に commit する
   - 問いに答えるときは、その機能の `docs/features/f-NN-<機能名>/handoff.md` を読む。来た問いと答え・直したことを handoff.md に足す
-  - inbox・outbox・`docs/progress.md`・outbox の機能の記録を扱う。worktree 側の進み具合は、`.worktrees/next/` の下の handoff.md を読んで `docs/progress.md` に写す。polish 側の進み具合も、`.worktrees/polish/docs/polish/handoff.md` を読んで写す
+  - inbox・outbox・`docs/progress.md`・outbox の機能の記録を扱う。worktree 側の進み具合は、`.worktrees/next/` の下の handoff.md を読んで `docs/progress.md` に写す
   - `docs/progress.md` を書き直したら、`cp docs/progress.md .worktrees/next/docs/progress.md` と `cp docs/progress.md .worktrees/polish/docs/progress.md` で、worktree 側と polish 側へ写しを置く（写しも `.gitignore` で git に入らない）
   - worktree 側の実装が済んだら、`git merge f-NN-<機能名>` で main に取り込む。`polish` は取り込まない
 - **worktree 側**（`.worktrees/next/`。機能が変わっても同じディレクトリを使う）
