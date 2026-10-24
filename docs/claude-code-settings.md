@@ -136,6 +136,7 @@
 | 機能ごとの記録の項目と書き方 | skill `feature-record`（手順と雛形） |
 | 1機能の進め方・inbox と outbox の書式 | 要件（CLAUDE.md が読み込む） |
 | commit するもの | CLAUDE.md |
+| 機能を足すたびに README.md のセットアップ・起動・使い方を直す（持ち主の指示） | CLAUDE.md |
 | 走行の記録を git に入れない | `.gitignore` の `traces/` |
 | テスト・lint・型の検査 | `pyproject.toml` の設定と、CLAUDE.md の「commit の前に走らせる」 |
 | 1ファイル 200 行程度・関数 50 行まで | 要件（CLAUDE.md が読み込む）。lint では検査していない |
