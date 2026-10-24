@@ -1,5 +1,5 @@
 """起動: python -m local_coding_agent --model <モデルのタグ> [--host <URL>]
-[--system-prompt-file <パス>] [--debug [raw]]
+[--system-prompt-file <パス>] [--debug [raw]] [--no-bell]
 """
 
 import argparse
@@ -49,7 +49,21 @@ def parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         help="Ollama の応答を全て表示する。値なし: 推論の文と、本文のほかの欄も出す。"
         "raw: 届いた行をそのまま出す",
     )
+    parser.add_argument(
+        "--no-bell",
+        action="store_true",
+        help="応答が終わったときに、端末のベルを鳴らさない",
+    )
     return parser.parse_args(argv)
+
+
+def display_for(args: argparse.Namespace, terminal: bool) -> repl.Display:
+    """表示の設定を決める。色とベルは、出力が端末のときだけ使う。"""
+    return repl.Display(
+        color=terminal,
+        debug=args.debug or "off",
+        bell=terminal and not args.no_bell,
+    )
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -73,7 +87,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         trace=trace,
         clock=time.monotonic,
         now=local_now,
-        display=repl.Display(color=sys.stdout.isatty(), debug=args.debug or "off"),
+        display=display_for(args, sys.stdout.isatty()),
     )
     repl.run(session)
     return 0

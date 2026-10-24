@@ -10,6 +10,8 @@ type Kind = Literal["text", "thinking", "note"]
 
 DIM = "\x1b[2m"
 RESET = "\x1b[0m"
+# 端末のベル。鳴るか・どの音かは端末の設定による
+BELL = "\a"
 
 
 class Screen:
@@ -43,3 +45,8 @@ class Screen:
         if not self._at_line_start:
             self._output.write("\n")
             self._at_line_start = True
+
+    def bell(self) -> None:
+        """端末のベルを鳴らす。カーソルは動かない。"""
+        self._output.write(BELL)
+        self._output.flush()

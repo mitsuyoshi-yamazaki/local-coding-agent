@@ -3,7 +3,7 @@ import unittest
 from datetime import datetime, timedelta, timezone
 
 from local_coding_agent.cli import repl
-from local_coding_agent.cli.screen import DIM, RESET
+from local_coding_agent.cli.screen import BELL, DIM, RESET
 from local_coding_agent.model.chat import (
     Done,
     ModelError,
@@ -189,6 +189,26 @@ class DebugDisplayTest(unittest.TestCase):
         self.assertIn("\n答え", output)
         _, _, plain = run_repl(["a"], [THINKING_SCRIPT], repl.Display(debug="readable"))
         self.assertNotIn(DIM, plain)
+
+
+class BellTest(unittest.TestCase):
+    def test_rings_after_reply_and_error_but_not_cancel(self) -> None:
+        _, _, output = run_repl(
+            ["a", "b", "c"],
+            [
+                [TextDelta("x"), STOP],
+                [ModelError("繋がらない")],
+                [TextDelta("y"), KeyboardInterrupt()],
+            ],
+            repl.Display(bell=True),
+        )
+        self.assertEqual(output.count(BELL), 2)
+        # 数値の行の後に鳴らす
+        self.assertIn(f"全体 1.00 秒]\n{BELL}", output)
+
+    def test_silent_when_disabled(self) -> None:
+        _, _, output = run_repl(["a"], [[TextDelta("x"), STOP]])
+        self.assertNotIn(BELL, output)
 
 
 if __name__ == "__main__":

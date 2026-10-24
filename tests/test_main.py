@@ -5,7 +5,7 @@ from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest import mock
 
-from local_coding_agent.__main__ import main, parse_args
+from local_coding_agent.__main__ import display_for, main, parse_args
 from local_coding_agent.cli.repl import Display
 
 
@@ -45,9 +45,19 @@ class MainTest(unittest.TestCase):
             redirect_stdout(io.StringIO()),
         ):
             main(["--model", "m", "--debug", "raw"])
-        # 出力がファイル（端末でない）なので、色は付けない
+        # 出力がファイル（端末でない）なので、色もベルも使わない
         self.assertEqual(
             run.call_args.args[0].display, Display(color=False, debug="raw")
+        )
+
+    def test_terminal_gets_color_and_bell_unless_no_bell(self) -> None:
+        self.assertEqual(
+            display_for(parse_args(["--model", "m"]), terminal=True),
+            Display(color=True, debug="off", bell=True),
+        )
+        self.assertEqual(
+            display_for(parse_args(["--model", "m", "--no-bell"]), terminal=True),
+            Display(color=True, debug="off", bell=False),
         )
 
     def test_missing_instructions_file_stops_before_start(self) -> None:

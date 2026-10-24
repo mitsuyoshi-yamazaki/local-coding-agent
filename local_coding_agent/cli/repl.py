@@ -41,6 +41,8 @@ class Display:
     # 推論の文や数値の行を薄くするなど、色を付けるか
     color: bool = False
     debug: DebugMode = "off"
+    # 応答が終わったら（誤りでも）端末のベルを鳴らすか。止めた回は鳴らさない
+    bell: bool = False
 
 
 @dataclass(frozen=True)
@@ -107,6 +109,8 @@ def run_turn(
     outcome = receive(session, request, screen)
     session.trace.write(response_record(turn, outcome))
     screen.line(summary(outcome))
+    if session.display.bell and outcome.status != "cancelled":
+        screen.bell()
     if outcome.status != "done":
         return history
     return (*messages, assistant_text(outcome.text))
