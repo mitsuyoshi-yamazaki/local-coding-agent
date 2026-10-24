@@ -1,11 +1,13 @@
 """会話の形。Claude の Messages API に揃え、発言を塊（content block）の並びで持つ。
 
-使う塊は本文（text）だけである。thinking・tool_use・tool_result の塊は、それを使う機能で足す。
+使う塊は、本文（text）・道具の呼び出し（tool_use）・道具の結果（tool_result）である。
+thinking の塊は、それを使う機能で足す。
 
 利用者の発言は、メタデータとして送った時刻（sent_at）を持つ。Messages API の発言には無い欄で、
 モデルは文しか読めないので、送る直前に本文の前へ文として入れる（metadata_text）。
 """
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal
@@ -21,7 +23,29 @@ class TextBlock:
     type: Literal["text"] = "text"
 
 
-type ContentBlock = TextBlock
+@dataclass(frozen=True)
+class ToolUseBlock:
+    """道具の呼び出しの塊。モデルの発言に入る。"""
+
+    # 呼び出しの id。結果の塊が、どの呼び出しの結果かをこれで示す
+    id: str
+    name: str
+    input: Mapping[str, object]
+    type: Literal["tool_use"] = "tool_use"
+
+
+@dataclass(frozen=True)
+class ToolResultBlock:
+    """道具の結果の塊。Messages API と同じく、利用者の発言に入る。"""
+
+    tool_use_id: str
+    content: str
+    # 道具が誤りを返した・入力が定義に合わない・利用者が拒んだ、のとき True
+    is_error: bool = False
+    type: Literal["tool_result"] = "tool_result"
+
+
+type ContentBlock = TextBlock | ToolUseBlock | ToolResultBlock
 
 
 @dataclass(frozen=True)
@@ -30,7 +54,7 @@ class Message:
 
     role: Role
     content: tuple[ContentBlock, ...]
-    # 利用者が送った時刻。モデルの発言では None
+    # 利用者が送った時刻。モデルの発言と、道具の結果の発言では None
     sent_at: datetime | None = None
 
 
@@ -42,6 +66,27 @@ def user_text(text: str, sent_at: datetime | None = None) -> Message:
 def assistant_text(text: str) -> Message:
     """本文だけの、モデルの発言を作る。"""
     return Message(role="assistant", content=(TextBlock(text),))
+
+
+def assistant_message(text: str, tool_uses: Sequence[ToolUseBlock]) -> Message:
+    """本文と道具の呼び出しからなる、モデルの発言を作る。
+
+    呼び出しがあって本文が空なら、本文の塊を入れない。呼び出しが無ければ assistant_text と同じ。
+    """
+    head = (TextBlock(text),) if text or not tool_uses else ()
+    return Message(role="assistant", content=(*head, *tool_uses))
+
+
+def tool_results(results: Sequence[ToolResultBlock]) -> Message:
+    """1回の応答の呼び出しの結果を、まとめて1つの利用者の発言にする。"""
+    return Message(role="user", content=tuple(results))
+
+
+def text_of(message: Message) -> str:
+    """発言の本文の塊を、つないで1つの文字列にする。"""
+    return "".join(
+        block.text for block in message.content if isinstance(block, TextBlock)
+    )
 
 
 def metadata_text(message: Message) -> str:

@@ -13,6 +13,8 @@ from local_coding_agent.context.system_prompt import (
     build_system_prompt,
     read_instructions,
 )
+from local_coding_agent.model.ollama_messages import ERROR_PREFIX
+from local_coding_agent.tools.default import DEFAULT_TOOLS
 
 
 class EnvironmentSectionTest(unittest.TestCase):
@@ -87,6 +89,13 @@ class SystemPromptTest(unittest.TestCase):
     def test_default_instructions_explain_what_harness_adds(self) -> None:
         self.assertIn("# 環境", DEFAULT_INSTRUCTIONS)
         self.assertIn("<metadata>", DEFAULT_INSTRUCTIONS)
+        # 誤りの結果の印（model/ollama_messages.py の ERROR_PREFIX）
+        self.assertIn(f"「{ERROR_PREFIX}」で始まる", DEFAULT_INSTRUCTIONS)
+
+    def test_default_instructions_name_the_default_tools(self) -> None:
+        for tool in DEFAULT_TOOLS:
+            with self.subTest(tool=tool.name):
+                self.assertIn(tool.name, DEFAULT_INSTRUCTIONS)
 
 
 if __name__ == "__main__":

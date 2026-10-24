@@ -1,0 +1,8 @@
+# サーバの設定
+
+[server]
+host = "127.0.0.1"
+port = 8642
+
+[ledger]
+path = "data/ledger.db"

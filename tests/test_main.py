@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest import mock
 
 from local_coding_agent.__main__ import main, parse_args
+from local_coding_agent.tools.default import DEFAULT_TOOLS
 
 
 class ArgsTest(unittest.TestCase):
@@ -29,9 +30,11 @@ class MainTest(unittest.TestCase):
             ):
                 code = main(["--model", "m", "--system-prompt-file", str(path)])
         self.assertEqual(code, 0)
-        system = run.call_args.args[0].system
-        self.assertTrue(system.startswith("長い指示\n\n# 環境\n"))
+        session = run.call_args.args[0]
+        self.assertTrue(session.system.startswith("長い指示\n\n# 環境\n"))
         self.assertIn(f"指示: {path}", output.getvalue())
+        self.assertEqual(session.tools, DEFAULT_TOOLS)
+        self.assertEqual(session.cwd, Path.cwd())
 
     def test_missing_instructions_file_stops_before_start(self) -> None:
         with (

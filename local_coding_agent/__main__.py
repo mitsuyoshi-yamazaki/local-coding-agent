@@ -18,7 +18,9 @@ from local_coding_agent.context.system_prompt import (
     build_system_prompt,
     read_instructions,
 )
+from local_coding_agent.loop.session import Session
 from local_coding_agent.model.ollama import OllamaChat
+from local_coding_agent.tools.default import DEFAULT_TOOLS
 from local_coding_agent.trace.writer import TraceWriter, trace_path
 
 DEFAULT_HOST = "http://localhost:11434"
@@ -52,14 +54,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         path = args.system_prompt_file
         sys.stderr.write(f"指示のファイルを読めない（{path}）: {error}\n")
         return 2
-    environment = collect_environment(Path.cwd())
+    cwd = Path.cwd()
+    environment = collect_environment(cwd)
     system = build_system_prompt(instructions, environment_section(environment))
     trace = TraceWriter(trace_path(TRACE_DIRECTORY, datetime.now()))
     sys.stdout.write(f"走行の記録: {trace.path}\n")
     sys.stdout.write(f"指示: {args.system_prompt_file or '既定'}\n")
-    session = repl.Session(
+    session = Session(
         model=OllamaChat(host=args.host, model=args.model),
         system=system,
+        tools=DEFAULT_TOOLS,
+        cwd=cwd,
         read_line=input,
         output=sys.stdout,
         trace=trace,

@@ -1,21 +1,20 @@
 import io
 import unittest
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 from local_coding_agent.cli import repl
 from local_coding_agent.model.chat import Done, ModelError, TextDelta
 from local_coding_agent.model.messages import assistant_text, user_text
 from tests.fakes import (
+    START,
     RecordingTrace,
     ScriptedModel,
     Step,
+    fake_session,
     scripted_lines,
-    ticking_clock,
-    ticking_now,
 )
 
 STOP = Done(done_reason="stop", stats={"prompt_eval_count": 7, "eval_count": 2})
-START = datetime(2026, 10, 24, 15, 30, tzinfo=timezone(timedelta(hours=9)))
 
 
 def at(minutes: int) -> datetime:
@@ -30,14 +29,8 @@ def run_repl(
     model = ScriptedModel(script)
     trace = RecordingTrace()
     output = io.StringIO()
-    session = repl.Session(
-        model=model,
-        system="指示",
-        read_line=scripted_lines(*lines),
-        output=output,
-        trace=trace,
-        clock=ticking_clock(),
-        now=ticking_now(START),
+    session = fake_session(
+        model, read_line=scripted_lines(*lines), trace=trace, output=output
     )
     repl.run(session)
     return model, trace, output.getvalue()
@@ -121,10 +114,13 @@ class OutputAndTraceTest(unittest.TestCase):
         request, response = trace.records
         self.assertEqual(request["type"], "request")
         self.assertEqual(request["turn"], 1)
+        self.assertEqual(request["step"], 1)
         self.assertEqual(request["url"], "http://fake/api/chat")
         self.assertEqual(response["type"], "response")
+        self.assertEqual(response["step"], 1)
         self.assertEqual(response["status"], "done")
         self.assertEqual(response["text"], "x")
+        self.assertEqual(response["tool_calls"], [])
         self.assertEqual(response["done_reason"], "stop")
         self.assertEqual(
             response["model_stats"], {"prompt_eval_count": 7, "eval_count": 2}
