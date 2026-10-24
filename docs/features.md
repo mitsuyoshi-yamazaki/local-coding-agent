@@ -2,6 +2,12 @@
 
 このリポジトリで作る機能の一覧である。Claude Code の機能と、他のコーディングエージェント（Aider・OpenCode・Codex・OpenHands など）が持つ機能から選んでいる。用語の意味は [コーディングエージェントの仕組み](how-coding-agents-work.md) にある。
 
+機能ごとの文書（実装前の仕様・実装した仕様・計測の結果）は、`features/f-NN-<機能名>/` にある。
+
+| 機能 | 文書 |
+|---|---|
+| F-01 | [f-01-chat-and-trace](features/f-01-chat-and-trace/spec.md) |
+
 ## 第1部 中核
 
 ここまで作ると、小さな課題（失敗するテストを直す、など）をエージェントに解かせられる。
