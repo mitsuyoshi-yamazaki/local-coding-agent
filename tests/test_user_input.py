@@ -9,6 +9,7 @@ from local_coding_agent.cli.user_input import (
     CONTINUATION_PROMPT,
     PASTE_END,
     PASTE_START,
+    InputCancelled,
     bracketed_paste,
     read_request,
 )
@@ -23,7 +24,11 @@ class Lines:
 
     def __call__(self, prompt: str) -> str:
         self.prompts.append(prompt)
-        return next(self.remaining)
+        try:
+            return next(self.remaining)
+        except StopIteration:
+            # 行が尽きたら、Ctrl-D を真似る
+            raise EOFError from None
 
 
 def read(*lines: str) -> tuple[str, list[str]]:
@@ -63,7 +68,8 @@ class PasteTest(unittest.TestCase):
         )
 
     def test_paste_ending_with_newline(self) -> None:
-        self.assertEqual(read(f"{PASTE_START}a", "b", f"{PASTE_END}")[0], "a\nb\n")
+        # 貼り付けた文の末尾の改行は、依頼に残さない
+        self.assertEqual(read(f"{PASTE_START}a", "b", f"{PASTE_END}")[0], "a\nb")
 
     def test_backslash_inside_paste_does_not_continue(self) -> None:
         self.assertEqual(
@@ -82,6 +88,27 @@ class PasteTest(unittest.TestCase):
             read(f"{PASTE_START}a{PASTE_END} と {PASTE_START}b", f"c{PASTE_END}")[0],
             "a と b\nc",
         )
+
+
+class CancelTest(unittest.TestCase):
+    def test_ctrl_d_on_first_line_is_end_of_input(self) -> None:
+        with self.assertRaises(EOFError):
+            read()
+
+    def test_ctrl_d_while_continuing_cancels_request(self) -> None:
+        with self.assertRaisesRegex(InputCancelled, "Ctrl-D"):
+            read("a\\")
+
+    def test_ctrl_d_inside_paste_cancels_request(self) -> None:
+        with self.assertRaisesRegex(InputCancelled, "Ctrl-D"):
+            read(f"{PASTE_START}a")
+
+    def test_arrow_key_cancels_request(self) -> None:
+        with self.assertRaisesRegex(InputCancelled, "矢印キー"):
+            read("abc\x1b[DX")
+
+    def test_escape_inside_paste_is_kept(self) -> None:
+        self.assertEqual(read(f"{PASTE_START}色\x1b[31m{PASTE_END}")[0], "色\x1b[31m")
 
 
 class FakeTerminal(io.StringIO):

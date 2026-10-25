@@ -11,7 +11,7 @@ from datetime import datetime
 from typing import Literal, TextIO
 
 from local_coding_agent.cli.screen import Screen
-from local_coding_agent.cli.user_input import read_request
+from local_coding_agent.cli.user_input import InputCancelled, read_request
 from local_coding_agent.model.chat import (
     ChatModel,
     ChatRequest,
@@ -87,6 +87,12 @@ def run(session: Session) -> None:
             return
         except KeyboardInterrupt:
             session.output.write("\n")
+            continue
+        except InputCancelled as cancelled:
+            screen = Screen(session.output, session.display.color)
+            screen.write("\n")
+            screen.line(f"（{cancelled}。この依頼は送らない）", "note")
+            screen.write("\n")
             continue
         if not line.strip():
             continue

@@ -108,6 +108,11 @@ class HistoryTest(unittest.TestCase):
         model, _, _ = run_repl(["一行目\\", "二行目"], [[TextDelta("x"), STOP]])
         self.assertEqual(model.sent, [(user_text("一行目\n二行目", at(0)),)])
 
+    def test_request_with_arrow_key_is_not_sent(self) -> None:
+        model, _, output = run_repl(["ab\x1b[Dc", "a"], [[TextDelta("x"), STOP]])
+        self.assertEqual(model.sent, [(user_text("a", at(0)),)])
+        self.assertIn("（矢印キーなどの、行を編集するキーは使えない。", output)
+
 
 class SystemPromptAndMetadataTest(unittest.TestCase):
     def test_sends_same_system_prompt_every_turn(self) -> None:
