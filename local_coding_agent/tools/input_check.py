@@ -4,11 +4,12 @@
 ハーネスが照らし、合わなければ、どこが合わないかを誤りの結果としてモデルに返す。
 
 照らすのは、このリポジトリの道具が使う範囲だけである: 必須の欄（required）・欄の型（type）・
-数の下限（minimum）。定義に無い欄は見ない。
+数の下限（minimum）と上限（maximum）。定義に無い欄は見ない。
 """
 
 import json
 from collections.abc import Mapping
+from typing import TypeIs
 
 # JSON Schema の型と、json.loads が返す Python の型
 _TYPES: dict[str, tuple[type, ...]] = {
@@ -49,8 +50,11 @@ def _property_problem(name: str, rule: dict[str, object], item: object) -> str |
     if isinstance(expected, str) and not _has_type(item, expected):
         return f"{name} は {expected} でなければならない（受けた値: {_shown(item)}）"
     minimum = rule.get("minimum")
-    if _below(item, minimum):
+    if _is_number(item) and _is_number(minimum) and item < minimum:
         return f"{name} は {minimum} 以上でなければならない（受けた値: {_shown(item)}）"
+    maximum = rule.get("maximum")
+    if _is_number(item) and _is_number(maximum) and item > maximum:
+        return f"{name} は {maximum} 以下でなければならない（受けた値: {_shown(item)}）"
     return None
 
 
@@ -61,12 +65,9 @@ def _has_type(item: object, expected: str) -> bool:
     return isinstance(item, _TYPES.get(expected, (object,)))
 
 
-def _below(item: object, minimum: object) -> bool:
-    """item と minimum がどちらも数で、item が minimum より小さいか。"""
-    if isinstance(item, bool) or isinstance(minimum, bool):
-        return False
-    numbers = (int, float)
-    return isinstance(item, numbers) and isinstance(minimum, numbers) and item < minimum
+def _is_number(value: object) -> TypeIs[int | float]:
+    """value が数か。真偽値は数としない（上の _has_type と同じ理由）。"""
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
 def _shown(item: object) -> str:

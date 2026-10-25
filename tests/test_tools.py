@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from local_coding_agent.tools import list_directory, read_file
+from local_coding_agent.tools import list_directory, read_file, run_command
 from local_coding_agent.tools.default import DEFAULT_TOOLS
 from local_coding_agent.tools.input_check import input_problem
 from local_coding_agent.tools.tool import ToolError, find_tool
@@ -152,6 +152,14 @@ class InputCheckTest(unittest.TestCase):
                 self.assertIsNotNone(problem)
                 self.assertIn(message, str(problem))
 
+    def test_maximum(self) -> None:
+        schema = run_command.DEFINITION.input_schema
+        self.assertIsNone(input_problem(schema, {"command": "x", "timeout": 600}))
+        self.assertEqual(
+            input_problem(schema, {"command": "x", "timeout": 601}),
+            "timeout は 600 以下でなければならない（受けた値: 601）",
+        )
+
 
 class DefaultToolsTest(unittest.TestCase):
     def test_tools_and_which_change_files(self) -> None:
@@ -162,6 +170,7 @@ class DefaultToolsTest(unittest.TestCase):
                 ("list_directory", False),
                 ("write_file", True),
                 ("edit_file", True),
+                ("run_command", True),
             ],
         )
 
@@ -172,7 +181,7 @@ class DefaultToolsTest(unittest.TestCase):
 
     def test_find_tool(self) -> None:
         self.assertIs(find_tool(DEFAULT_TOOLS, "read_file"), read_file.TOOL)
-        self.assertIsNone(find_tool(DEFAULT_TOOLS, "run_command"))
+        self.assertIsNone(find_tool(DEFAULT_TOOLS, "web_search"))
 
 
 if __name__ == "__main__":

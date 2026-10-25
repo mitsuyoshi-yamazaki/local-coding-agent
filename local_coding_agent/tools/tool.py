@@ -5,6 +5,8 @@
 
 変更を伴う道具は、実行の前に人に見せる文（下見。ファイルを書く道具なら差分）を作る関数も
 持てる。下見の関数は、実行する関数と同じ入力を受け、何も変えずに文を返す。
+
+道具は、結果の文から、画面に出す結果の1行を作る関数も持てる。持たなければ、行数を出す。
 """
 
 from collections.abc import Callable, Mapping, Sequence
@@ -31,6 +33,8 @@ class Tool:
     run: Callable[[ToolInput, Path], str]
     # 実行の前に人に見せる文を作る関数。無ければ None。誤りは ToolError で知らせる
     preview: Callable[[ToolInput, Path], str] | None = None
+    # 結果の文から、画面に出す結果の1行を作る関数。無ければ None。誤りの結果には使わない
+    summary: Callable[[str], str] | None = None
 
     @property
     def name(self) -> str:

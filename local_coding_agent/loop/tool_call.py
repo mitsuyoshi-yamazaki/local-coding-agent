@@ -66,7 +66,8 @@ def run_tool_call(
     """呼び出しを1つ処理し、呼び出しと結果を1行ずつ表示する。"""
     session.output.write(f"[道具] {use.name} {_json(dict(use.input))}\n")
     run = execute(session, use)
-    session.output.write(f"→ {result_summary(run.result)}\n")
+    tool = find_tool(session.tools, use.name)
+    session.output.write(f"→ {result_summary(run.result, tool)}\n")
     session.trace.write(tool_record(turn, step, use, run))
     return run.result
 
@@ -118,10 +119,14 @@ def _error(use: ToolUseBlock, text: str) -> ToolResultBlock:
     return ToolResultBlock(use.id, text, is_error=True)
 
 
-def result_summary(result: ToolResultBlock) -> str:
-    """結果の1行。誤りならその文、そうでなければ結果の文の行数。"""
+def result_summary(result: ToolResultBlock, tool: Tool | None = None) -> str:
+    """結果の1行。誤りならその文。そうでなければ、道具が結果の1行を作る関数を持てば
+    その1行、持たなければ結果の文の行数。
+    """
     if result.is_error:
         return f"誤り: {result.content}"
+    if tool is not None and tool.summary is not None:
+        return tool.summary(result.content)
     return f"{len(result.content.splitlines())} 行"
 
 
