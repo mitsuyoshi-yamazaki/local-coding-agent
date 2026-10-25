@@ -4,8 +4,8 @@ polish 側（branch `polish`）で行ったことと、main との差異の記�
 
 ## 現在の状況
 
-- 作業中の issue: 無い
-- 人を待っていること: main 側への変更の依頼（下の「main 側に頼むこと」）
+- 作業中の issue: H-01〜H-04。実装し、テスト・lint・型の検査が通った（下の経過の 2026-10-25）
+- 人を待っていること: H-01〜H-04 を、実物のモデルと端末で試して、解決したかを確かめる。特に、ベルが鳴るか（端末の設定による）・貼り付けで `^[[200~` が見えないか・矢印キーを打った依頼が取り消されるか
 - `.venv/` は Python 3.14.4 でできている。polish のセッションの中では `poetry` のコマンドが「Current Python version (3.6.5) is not allowed」で止まるので、`poetry` は持ち主が端末で走らせる（下の経過）
 
 ## main との差異
@@ -24,15 +24,20 @@ polish 側（branch `polish`）で行ったことと、main との差異の記�
 
 - `.claude/rules/polish.md` がある（main には無い）
 - `.gitignore` に、`docs/polish/issues-human.md`・`docs/polish/issues-claude.md` がある
-- CLAUDE.md の「polish 側」の項は、引き継ぎの置き場を `docs/polish/polish-progress.md` と `.claude/rules/polish.md` にしている（main は `docs/polish/handoff.md` を指している。main 側に同じ文面への直しを頼んでいる）
+- README.md の「起動」に `--debug`・`--no-bell` があり、「使い方」に、改行の入れ方・行の編集・ベル・区切りの説明と、空行を入れた画面の例がある。Ctrl-D の説明に、依頼の途中では取り消しになることがある
 
 ### コード
 
-- 差異は無い
+- `model/chat.py`・`model/ollama.py`: 応答の知らせに、`RawLine`（届いた行そのもの）・`ThinkingDelta`（推論の文）・`OtherFields`（本文と推論の文のほかの欄）がある。main は本文の断片と終わりの知らせだけ
+- `cli/screen.py`（main に無い）: 画面への書き出し。文の種類（本文・推論の文・添え書き）ごとに薄い色を付け、行の頭にいるかを覚える。ベルも鳴らす
+- `cli/user_input.py`（main に無い）: 行末の `\` と bracketed paste で、改行を含む依頼を読む。依頼の途中の Ctrl-D と、矢印キーなどを打った依頼は取り消す。REPL の間、端末の ECHOCTL を切る
+- `cli/repl.py`: `Display`（色・デバッグの段・ベル）を持つ。入力の後と数値の行の後に空行を入れ、数値の行を薄くする。デバッグの段に合わせて知らせを表示する
+- `__main__.py`: `--debug [raw]`・`--no-bell` がある。色とベルは、出力が端末のときだけ使う。起動の知らせの後に空行を入れる
+- main と衝突しそうな所: main が F-03（道具の呼び出し）や F-09（thinking）で、`read_stream`・`StreamEvent`・`repl.receive` を変えると衝突する。polish の変更を活かして解く
 
 ## main 側に頼むこと
 
-- CLAUDE.md の main 側の項から、polish 側の進み具合を写す記述を消す。CLAUDE.md の polish 側の項を、polish の branch と同じ文面に直す。docs/progress.md の polish 側の進み具合の見方を直す（2026-10-24 に、依頼の文面を人に渡した）
+- 無い
 
 ## 経過
 
@@ -48,3 +53,11 @@ polish 側（branch `polish`）で行ったことと、main との差異の記�
 ### 2026-10-25
 
 - 持ち主の指示で、issues-human.md は人が `--` より下に箇条書きで書き、番号と題は Claude Code が取り出す前に振る形にした（`.claude/rules/polish.md`）
+- main を取り込んだ（`fa8b701`・`5323358`）。衝突は無かった。main 側に頼んでいた CLAUDE.md と progress.md の直しは、main の `52cd6f0` で済んでいた
+- issues-human.md の4件に H-01〜H-04 を振り、人と仕様を決めた（specs/ は書いていない）
+  - H-01: `--debug` は、推論の文を薄い色で本文の前に出し、本文と推論の文のほかの欄を JSON で出す（途中の行では、毎回同じ形で来る model・created_at・done を除く）。`--debug raw` は、届いた行をそのまま出す
+  - H-02: 端末のベル（`\a`）。応答が終わった回と誤りの回に鳴らし、Ctrl-C で止めた回は鳴らさない。既定で鳴らし、`--no-bell` で止める
+  - H-03: 入力の後と数値の行の後に空行を入れ、数値の行を薄い色にする。誤りの行は薄くしない
+  - H-04: 行末の `\` で続ける。bracketed paste で、貼り付けた複数行を1つの依頼にする
+- H-01〜H-04 を実装した（`287b60e`・`9b97898`・`0d649b9`・`7943d12`）。色とベルは、出力が端末のときだけ使う
+- code-reviewer の指摘と、自分で気づいた点で H-04 を直した（`4f6a60e`）: 依頼の途中の Ctrl-D は REPL を終えずに依頼を取り消す・末尾の改行を除く・矢印キーなどを打った依頼は送らない（ECHOCTL を切ったので、画面のカーソルだけが動き、依頼の中身と食い違うため）。canonical mode から来る制限（1行の長さの上限・貼り付けた制御文字）は C-06 に書いた。行の編集は C-05 に書いた
