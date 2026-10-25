@@ -185,3 +185,13 @@ F-01 で、呼ばれる側を挙げるときは、それを呼ぶ入口を一緒
 ## 問いと答えの記録
 
 main 側のセッションが、人から来た問いと答え・直したことを足す。
+
+### main への取り込み（2026-10-25）
+
+- 取り込んだ commit: `14214a7`（`Merge branch 'f-04'`）。基点は main の `6d16353`。f-04 の分岐点は `49b641e` で、main はそこから6つ進んでいたので、早送りにはならなかった
+- 衝突: `docs/features.md` の機能の文書の表だけ。main は F-02・F-03 の行に計測の結果へのリンクを足し（`6102c86`）、f-04 は F-04 の行を足していた。main の F-02・F-03 の行を残し、その後に F-04 の行を足した
+- main が分岐点の後に触ったのは docs と skill だけで、コードには触れていない。「main と衝突しそうな所」に挙がったファイルに、意味の衝突は無い
+- 「main 側に頼むこと」の F-02 の行のリンクは、main の `6102c86` で直してあった
+- 検査: テスト146件・`ruff check`・`ruff format --check`・mypy が通った
+- main で直したこと（`bba9301`）: `tasks/f-04-file-edit/README.md` の起動のコマンドに `PYTHONPATH=../..` を足した。`pyproject.toml` が `package-mode = false` で、パッケージが `.venv` に入っていないため、写しの中から `python -m local_coding_agent` を呼ぶと `No module named local_coding_agent` になる（`-P` で作業ディレクトリを `sys.path` から外して確かめた）。前の写しを消してから写し直すことも書き添えた（`cp -R` は、写し先があるとその中に写す）
+- この引き継ぎとの食い違い: 読む順の 7. は `tools/lines.py` を「`read_file.run` と `edit_file` から呼ばれる」とするが、`write_file.plan`・`file_change._diff_lines`・`text_match`（`nearest`・`_line_spans`）も使う。`lines.py` の docstring も「read_file と edit_file が共に使う」のまま（直していない）
