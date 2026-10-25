@@ -17,10 +17,12 @@
 ```sh
 cp -R tasks/f-04-file-edit/project .tmp/f-04
 cd .tmp/f-04
-../../.venv/bin/python -m local_coding_agent --model qwen3.5:9b
+PYTHONPATH=../.. ../../.venv/bin/python -m local_coding_agent --model qwen3.5:9b
 ```
 
-走行の記録は、写しの中の `traces/` に書かれる。
+- パッケージは `.venv` に入れていない（`pyproject.toml` の `package-mode = false`）ので、`PYTHONPATH` でリポジトリの根を渡す
+- 写し直すときは、前の写しを消してから写す。`cp -R` は、写し先のディレクトリがあると、その中に `project/` を写す
+- 走行の記録は、写しの中の `traces/` に書かれる
 
 ## 判定
 
