@@ -59,7 +59,7 @@ CLAUDE.md の「Python の環境」の4つ（unittest・`ruff check`・`ruff for
 記録する。
 
 - handoff.md の「問いと答えの記録」に、取り込みの節を足す: 日付・取り込んだ commit・基点・衝突したファイルと解き方・検査の結果・main で直したこと。commit する（`docs: …`）
-- `docs/progress.md` を書き直す（CLAUDE.md の「記録」）: 「機能ごとの段」の実装を済にする・「現在の状況」の確認中の機能・「人を待っていること」（読む・試す。handoff.md の「人に消してもらうもの」）・「経過」に足す。書き直したら、CLAUDE.md の main 側のとおり、`.worktrees/next/` と `.worktrees/polish/` へ写しを置く
+- `docs/progress.md` を書き直す（CLAUDE.md の「記録」）: 「機能ごとの段」の実装を済にする・「現在の状況」の確認中の機能・「人を待っていること」（読む・試す）・「経過」に足す。書き直したら、CLAUDE.md の main 側のとおり、`.worktrees/next/` と `.worktrees/polish/` へ写しを置く
 
 ## 5. 人に示す
 
@@ -93,4 +93,4 @@ CLAUDE.md の「Python の環境」の4つ（unittest・`ruff check`・`ruff for
 - 文書・試す材料・設定の変わり（短く）
 - 衝突を解いて、branch の実装から変えた所
 
-最後に、人に頼むこと（branch の削除など、Claude Code が行わない操作のコマンド）を並べる。この後に来た人の問いには handoff.md を読んで答え、問いと答え・直したことを「問いと答えの記録」に足す（CLAUDE.md の main 側）。
+最後に、人に頼むこと（push など、Claude Code が行わない操作のコマンド）を並べる。branch と stash の削除は、handoff.md に書いてあっても頼まない（CLAUDE.md の「削除」）。この後に来た人の問いには handoff.md を読んで答え、問いと答え・直したことを「問いと答えの記録」に足す（CLAUDE.md の main 側）。
