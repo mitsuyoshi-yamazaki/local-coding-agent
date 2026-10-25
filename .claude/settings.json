@@ -98,7 +98,7 @@
   "sandbox": {
     "enabled": true,
     "allowUnsandboxedCommands": false,
-    "excludedCommands": ["git *", "poetry *"],
+    "excludedCommands": ["git *", "poetry install", "poetry add --group dev *"],
     "network": {
       "allowedDomains": [],
       "deniedDomains": ["*"]

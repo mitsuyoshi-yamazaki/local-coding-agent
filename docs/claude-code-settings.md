@@ -2,8 +2,8 @@
 
 このリポジトリで開発に使う Claude Code の設定を、[要件](requirements.md) からどう書き起こしたかを示す対応表である。書き起こしの手順は `.claude/skills/derive-settings/SKILL.md` にある。
 
-- Claude Code の版: 2.1.308
-- 公式の文書を確かめた日: 2026-10-24
+- Claude Code の版: 2.1.308。sandbox の除外（`sandbox.excludedCommands`）は 2.1.310 で確かめた
+- 公式の文書を確かめた日: 2026-10-24。sandbox の除外は 2026-10-25（[sandboxing](https://code.claude.com/docs/en/sandboxing)・[settings-reference](https://code.claude.com/docs/en/settings-reference) の `sandbox.excludedCommands`）
 
 ## 設定の置き場
 
@@ -23,7 +23,7 @@
 | 手段 | 何を縛るか | 限界 |
 |---|---|---|
 | permissions（deny・ask・allow） | 道具の呼び出しを、規則と照合して拒む・人に確かめる・確かめずに通す。照合は deny → ask → allow の順で、どの設定ファイルの deny も allow に勝つ。ask は auto mode でも人に確かめる | Bash の規則はコマンドの文字列で照合する。同じ操作を別の書き方（`/bin/rm`・`sh -c '…'`・Python から呼ぶ、など）にすると一致しない |
-| sandbox | Bash のコマンドとその子のプロセスを、OS（macOS では Seatbelt）で縛る。書き込みは作業ディレクトリと一時ディレクトリだけ。ネットワークは許したドメインだけ | Read・Edit・WebFetch などの道具には効かない。sandbox の外で走らせるコマンド（`excludedCommands`）には効かない。削除は縛らない |
+| sandbox | Bash のコマンドとその子のプロセスを、OS（macOS では Seatbelt）で縛る。書き込みは作業ディレクトリと一時ディレクトリだけ。ネットワークは許したドメインだけ | Read・Edit・WebFetch などの道具には効かない。sandbox の外で走らせるコマンド（`excludedCommands`）には効かない。除外は、呼び出しの中の全てのコマンドが除外の型に一致したときだけ効き、`cd`・リダイレクト・コマンドの置き換えを含む呼び出しは sandbox の中に残る。削除は縛らない |
 | `blockReadsOutsideWorkingDirectories` | Read・Grep・Glob が作業ディレクトリの外を読むのを拒む。sandbox と併せると、sandbox の中のコマンドもホームディレクトリなどを読めない | 利用者の設定で足した作業ディレクトリと、Claude Code が要る `~/.claude` の一部は読める |
 | hook（PreToolUse） | 道具の呼び出しの前にスクリプトを走らせ、入力を見て拒む | 登録した道具にしか効かない |
 | CLAUDE.md・rule | Claude への指示 | 強制力は無い |
@@ -52,7 +52,7 @@
 
 止められない部分:
 
-- sandbox の外で走る `git` と `poetry` の読み書き（`git` は `~/.gitconfig` と ssh の鍵を読む。`poetry` はリポジトリの外のキャッシュに書く）
+- sandbox の外で走る `git` と、除外した `poetry` のコマンド（下の「道具の導入とモデルの取り込み」）の読み書き（`git` は `~/.gitconfig` と ssh の鍵を読む。`poetry` はリポジトリの外のキャッシュに書く）
 - sandbox が許す一時ディレクトリへの書き込み
 - 利用者の設定で足した作業ディレクトリの読み取り
 
@@ -63,10 +63,14 @@
 | `poetry.toml` | `virtualenvs.in-project = true`。仮想環境をリポジトリの中（`.venv/`）に作る |
 | ask | `poetry` の全てのコマンド（依存の導入は人と相談するため） |
 | deny | リポジトリの外に入れる操作: `uv tool`・`pipx`・`brew`・`pip install`・`ollama pull`/`rm`/`create`/`cp`/`push` |
-| sandbox の除外 | `poetry` は自分の置き場（`~/.local`）を読むので、sandbox の外で走らせる |
-| CLAUDE.md | 一時ファイルは `.tmp/` に置く |
+| sandbox の除外 | `poetry install`（引数なし）と `poetry add --group dev …` だけを、sandbox の外で走らせる。`poetry` は自分の置き場（`~/.local`）を読むので、sandbox の中では見つからない。ほかの形（`poetry run …`・引数を付けた `poetry install`・ほかのサブコマンド）は除外の型に一致せず、sandbox の中に残って失敗する |
+| CLAUDE.md | 一時ファイルは `.tmp/` に置く。コードは `.venv/bin/python` で走らせる（`poetry run` は使わない） |
 
-止められない部分: `poetry` のダウンロードのキャッシュは、リポジトリの外（Poetry のキャッシュのディレクトリ）に書かれる。
+止められない部分:
+
+- `poetry` のダウンロードのキャッシュは、リポジトリの外（Poetry のキャッシュのディレクトリ）に書かれる
+- 除外した `poetry` のコマンドは、リポジトリの中のファイル（`pyproject.toml`・`poetry.toml`・`poetry.lock`・`.venv/`）を読み、それに従って動く。sandbox の中のコマンドはこれらを書き換えられるので、書き換えてから除外したコマンドを走らせると、sandbox の外でコードが走り得る（公式の文書 sandboxing の、作業ディレクトリのファイルに従って動く道具を除外したときの警告。試していない）。`poetry` は ask なので人がコマンドを見るが、確認の画面からは前に書き換えたファイルは分からない
+- `poetry add --group dev …` の型には、パス・git・URL の依存を指す形と、`--directory` で別のプロジェクトを指す形も一致する。前者は指した先のコードを sandbox の外で組み立て得る。後者はリポジトリの外のプロジェクトを書き換える。ask で人がコマンドを見て断る
 
 ### git の remote の操作
 
@@ -86,7 +90,7 @@
 | deny | `curl`・`wget`・`ssh`・`scp`・`rsync`・`gh`・MCP の全ての道具（`mcp__*`）・`Artifact`・`ArtifactComments`・`ArtifactData`・`RemoteTrigger` |
 | allow | WebFetch・WebSearch（読むだけの道具） |
 
-止められない部分: WebFetch の URL に載せて送ること。sandbox の外で走る `git` と `poetry` の通信（`git push` は ask）。
+止められない部分: WebFetch の URL に載せて送ること。sandbox の外で走る `git` と、除外した `poetry` のコマンドの通信（`git push` は ask）。
 
 手元の Ollama を呼ぶこと: sandbox は全てのドメインを拒むので、今は sandbox の中のコマンドから Ollama に届かない。作ったエージェントを実物のモデルで走らせるときの扱いは、上流で設計の途中である。
 
@@ -94,7 +98,7 @@
 
 | 手段 | 設定 |
 |---|---|
-| sandbox | 上の `deniedDomains: ["*"]` で、sandbox の中のコマンド（作ったエージェント・`ollama` のコマンドを含む）は手元の Ollama にも届かない |
+| sandbox | 上の `deniedDomains: ["*"]` で、sandbox の中のコマンド（作ったエージェント・`ollama` のコマンドを含む）は手元の Ollama にも届かない。作ったエージェントとテストは `.venv/bin/python` で起動し、その子のプロセスまで sandbox の中で走る。`poetry run` で起動する形は除外の型に一致しないので、sandbox の外に出ない |
 
 止められない部分: 無いと見ている。ただし、手元の Ollama が入っていないので、届かないことは試していない。
 
@@ -151,7 +155,7 @@
 
 ## 止まるかを確かめた操作
 
-2026-10-24 に、設定を置いたセッションで試した。止まらなくても害の無い形で試している。
+2026-10-24 に、設定を置いたセッションで試した。`poetry` の行は、sandbox の除外を今の形にした 2026-10-25 に、同じセッションで試した。止まらなくても害の無い形で試している。
 
 | 操作 | 結果 |
 |---|---|
@@ -171,7 +175,13 @@
 | Python から `https://example.com` へ接続 | 許すドメインを空にしただけでは**止まらなかった**。`deniedDomains: ["*"]` を足して止まった（host is on the deny list） |
 | `git push --dry-run` | ask で人に確かめられた |
 | `git merge polish`（main 側。polish が main と同じ commit のときに試した） | deny で止まった |
+| `which poetry` | sandbox の中では見つからなかった（poetry not found） |
+| `poetry run python -c "print('ok')"` | sandbox の中に残り、走らなかった（operation not permitted: poetry・終了コード 127） |
+| `poetry install --dry-run` | 引数が付くと除外の型に一致せず、上と同じく走らなかった |
+| `poetry install && poetry run python -c "print('ok')"` | 呼び出しの全体が sandbox の中に残り、`poetry install` から走らなかった |
+| `poetry install` | sandbox の外で走った（入れるものは無かった） |
+| `poetry add --group dev --dry-run ruff` | sandbox の外で走った（ruff は入っているので何も足さなかった。`pyproject.toml` と `poetry.lock` は変わらなかった） |
 
-試していないもの: `mv`・`git restore` などの、上で試したものと同じ形の deny。`cd` と `poetry` の ask。
+試していないもの: `mv`・`git restore` などの、上で試したものと同じ形の deny。`cd` と `poetry` の ask（上の `poetry` の行は走ったが、確認が出たかは記録していない）。除外した `poetry` のコマンドに、書き換えたリポジトリの中のファイルを読ませて sandbox の外でコードを走らせる形（上の「道具の導入とモデルの取り込み」の止められない部分）。
 
 許すドメインを空にしただけで外へ出られた原因は、確かめていない。許すドメインは、`allowedDomains` と、どの設定ファイルの `WebFetch(domain:…)` の allow とも合わさる。このリポジトリの allow にある `WebFetch` はドメインを指定しない形で、公式の文書では、この形は sandbox の中のコマンドが届く先を変えない。確かめるには `deniedDomains` を外して試す必要があり、そのあいだ sandbox の中のコマンドが外へ出られるので、行っていない。
