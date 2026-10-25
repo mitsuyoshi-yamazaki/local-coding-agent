@@ -15,6 +15,7 @@
 | `.claude/rules/docs.md` | docs/ の書き方（docs/ の文書を読み書きすると読み込まれる） |
 | `.claude/skills/derive-settings/SKILL.md` | 要件から設定を書き起こす手順 |
 | `.claude/skills/feature-record/` | 機能の記録を書く手順と雛形 |
+| `.claude/skills/merge-feature/SKILL.md` | 機能の branch を main に取り込み、人が確かめるための案内（動作の確かめ方・読む順・既存の実装からの変わり）を示す手順。人が `/merge-feature <branch>` で呼ぶ（Claude が自分からは使わない） |
 | `pyproject.toml`・`poetry.toml` | Python の版・lint と型の検査の設定・仮想環境をリポジトリの中に作る設定 |
 | `.gitignore` | 仮想環境（`.venv/`）と一時ファイルの置き場（`.tmp/`）を git に入れない |
 
@@ -149,7 +150,7 @@
 | commit するもの | CLAUDE.md |
 | README.md にセットアップ・起動・使い方を書き、機能を足すたびに直す | CLAUDE.md |
 | 作業の進行を `docs/progress.md` に記録し、常に更新する（扱うのは main 側だけ） | CLAUDE.md と `.gitignore`（git に入れない）。docs/ の rule は当てない。worktree 側と polish 側のセッションは main 側のファイルを読めないので（下の行）、main 側が書き直すたびに各 worktree へ写しを置き、worktree 側は読むだけにする（CLAUDE.md の指示だけ）。写しも、worktree の `.gitignore` で git に入らない |
-| main 側で確認し、git worktree（`.worktrees/next`）で次の機能を実装する | CLAUDE.md（分担）と `.gitignore`（`.worktrees/`）。worktree 側のセッションは、作業ディレクトリが worktree なので、`blockReadsOutsideWorkingDirectories` と sandbox で main 側のファイルを読めず、hook で worktree の外を編集できない |
+| main 側で確認し、git worktree（`.worktrees/next`）で次の機能を実装する | CLAUDE.md（分担）と `.gitignore`（`.worktrees/`）。main への取り込みと、その後の確認の案内は skill `merge-feature`。worktree 側のセッションは、作業ディレクトリが worktree なので、`blockReadsOutsideWorkingDirectories` と sandbox で main 側のファイルを読めず、hook で worktree の外を編集できない |
 | git worktree（`.worktrees/polish`・branch `polish`）で、作るエージェントのソフトウェア面を改善する。polish は main へマージせず、main を polish へ一方的にマージする | CLAUDE.md（分担）・`.gitignore`（`.worktrees/`）・deny の `Bash(git merge *polish*)`（main と worktree 側で polish を取り込まない） |
 | 実装したセッションから、問いに答えるセッションへの引き継ぎ（`handoff.md`） | rule（`.claude/rules/docs.md`）と CLAUDE.md |
 | 走行の記録を git に入れない | `.gitignore` の `traces/` |
