@@ -2,9 +2,18 @@ import io
 import unittest
 
 from local_coding_agent.loop.model_call import THINKING_END, THINKING_START
-from local_coding_agent.loop.turn import THINKING_ONLY, run_turn
+from local_coding_agent.loop.turn import CANCELLED_NOTE, THINKING_ONLY, run_turn
 from local_coding_agent.model.chat import Done, TextDelta, ThinkingDelta, ToolCall
-from local_coding_agent.model.messages import assistant_text, user_text
+from local_coding_agent.model.messages import (
+    Message,
+    TextBlock,
+    ThinkingBlock,
+    ToolUseBlock,
+    assistant_message,
+    assistant_text,
+    user_text,
+)
+from local_coding_agent.model.ollama_messages import to_ollama_messages
 from tests.fakes import (
     START,
     RecordingTrace,
@@ -64,11 +73,23 @@ class RecordAndHistoryTest(unittest.TestCase):
         run = Run([[TextDelta("答え"), STOP]])
         self.assertEqual(run.response(1)["thinking"], "")
 
-    def test_thinking_is_not_added_to_history(self) -> None:
+    def test_thinking_is_kept_in_history_before_text(self) -> None:
         run = Run([THOUGHT])
-        self.assertEqual(
-            run.history, (user_text("依頼", START), assistant_text("答え"))
-        )
+        reply = Message("assistant", (ThinkingBlock("考える。続き"), TextBlock("答え")))
+        self.assertEqual(run.history, (user_text("依頼", START), reply))
+
+    def test_ctrl_c_in_next_step_keeps_thinking_of_finished_step(self) -> None:
+        call = ToolCall(id="c", name="noop", input={})
+        run = Run([[ThinkingDelta("読む"), call, STOP], [KeyboardInterrupt()]])
+        use = ToolUseBlock("c", "noop", {})
+        self.assertEqual(run.history[-2], assistant_message("", [use], "読む"))
+        self.assertEqual(run.history[-1].content[-1], TextBlock(CANCELLED_NOTE))
+
+    def test_thinking_of_tool_step_is_sent_in_next_step(self) -> None:
+        call = ToolCall(id="c", name="noop", input={})
+        run = Run([[ThinkingDelta("読む"), call, STOP], [TextDelta("答え"), STOP]])
+        use = ToolUseBlock("c", "noop", {})
+        self.assertEqual(run.model.sent[1][1], assistant_message("", [use], "読む"))
 
     def test_first_token_does_not_count_thinking(self) -> None:
         run = Run([[ThinkingDelta("考える"), STOP]])
@@ -138,6 +159,48 @@ class ThinkingOnlyTest(unittest.TestCase):
         call = ToolCall(id="c", name="noop", input={})
         run = Run([[ThinkingDelta("考える"), call, STOP], [TextDelta("答え"), STOP]])
         self.assertNotIn(THINKING_ONLY, run.output.getvalue())
+
+    def test_thinking_only_reply_keeps_thinking_and_empty_text(self) -> None:
+        run = Run([[ThinkingDelta("考える"), STOP]])
+        reply = Message("assistant", (ThinkingBlock("考える"), TextBlock("")))
+        self.assertEqual(run.history[-1], reply)
+
+
+class OllamaFormTest(unittest.TestCase):
+    """推論の塊は、Ollama のモデルの発言の thinking になる。"""
+
+    use = ToolUseBlock("c", "read_file", {"path": "a.txt"})
+
+    def test_thinking_block_becomes_thinking(self) -> None:
+        message = assistant_message("", [self.use], "読む")
+        self.assertEqual(
+            to_ollama_messages("", [message]),
+            [
+                {
+                    "role": "assistant",
+                    "content": "",
+                    "thinking": "読む",
+                    "tool_calls": [
+                        {
+                            "id": "c",
+                            "function": {
+                                "index": 0,
+                                "name": "read_file",
+                                "arguments": {"path": "a.txt"},
+                            },
+                        }
+                    ],
+                }
+            ],
+        )
+
+    def test_message_without_thinking_has_no_thinking(self) -> None:
+        converted = to_ollama_messages("", [assistant_text("答え")])
+        self.assertEqual(converted, [{"role": "assistant", "content": "答え"}])
+
+    def test_thinking_is_not_in_content(self) -> None:
+        message = assistant_message("答え", [], "考える")
+        self.assertEqual(to_ollama_messages("", [message])[0]["content"], "答え")
 
 
 if __name__ == "__main__":

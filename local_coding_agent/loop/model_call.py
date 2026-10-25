@@ -41,7 +41,7 @@ class Outcome:
     first_token_seconds: float | None
     total_seconds: float
     error: str | None = None
-    # 推論の文。履歴には足さない
+    # 推論の文。ループが、モデルの発言の推論の塊にして履歴に残す
     thinking: str = ""
 
 

@@ -43,7 +43,7 @@ def run_turn(
             outcome = call_model(session, messages, turn, step)
             if outcome.status != "done":
                 return _stopped(session, history, messages, outcome.status == "error")
-            reply = assistant_message(outcome.text, outcome.tool_uses)
+            reply = assistant_message(outcome.text, outcome.tool_uses, outcome.thinking)
             if not outcome.tool_uses:
                 if not outcome.text.strip():
                     session.output.write(THINKING_ONLY + "\n")

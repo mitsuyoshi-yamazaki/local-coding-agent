@@ -201,10 +201,11 @@ Claude Code も、Esc で止めると実行中の道具を取り消し、会話�
 推論を学習したモデルは、本文の前に推論の文を出す。Ollama は、推論の文を応答の `message.thinking` に、本文（`message.content`）と分けて載せる。要求に `think` を入れなければ、モデルの既定に従う。`qwen3.5:9b` は、`think` を入れなくても推論の文を返す（実測。[F-01 の計測の結果](../f-01-chat-and-trace/measurements.md)）。
 
 - `model/ollama.py` の `_message_events` は、`thinking` を推論の文の断片（`model/chat.py` の `ThinkingDelta`）に変える。同じ行に本文もあれば、推論の文を先に返す
-- `loop/model_call.py` の `receive` は、推論の文を集め、走行の記録の応答の件の `thinking` に入れる。履歴には足さないので、次の要求には入らない
+- `loop/model_call.py` の `receive` は、推論の文を集め、走行の記録の応答の件の `thinking` に入れる
+- `loop/turn.py` の `run_turn` は、推論の文を、モデルの発言の先頭の推論の塊（`model/messages.py` の `ThinkingBlock`。Messages API の thinking の塊にあたる）にして履歴に残す。`model/ollama_messages.py` は、送るときに、推論の塊を Ollama のモデルの発言の `thinking` に入れる。Ollama の道具の呼び出しの文書の例も、道具を呼んだモデルの発言を、推論の文ごと履歴に戻している。前の回の発言の推論の文も送る。そのうちどれをモデルに見せるかは、Ollama がモデルの入力を組み立てるときに決まる（確かめていない）
 - 起動のときに `--show-thinking` を付けると、推論の文を届いたそばから表示し、前後を `[推論]` と `[推論ここまで]` の行で囲む。推論の文の途中で Ctrl-C を押したときも、`[推論ここまで]` を出してから `（止めた）` を出す
 - 「最初の文字まで」の時間（`first_token_seconds`）は、本文か道具の呼び出しが最初に届くまでで、推論の文は数えない
-- `loop/turn.py` の `run_turn` は、応答が道具を呼ばず、本文も空（空白と改行だけのときを含む）なら、数値の1行の後に `（推論だけで終わった）` を出して回を終える。履歴には、本文が空のモデルの発言が残る
+- `run_turn` は、応答が道具を呼ばず、本文も空（空白と改行だけのときを含む）なら、数値の1行の後に `（推論だけで終わった）` を出して回を終える。履歴には、推論の塊と空の本文の塊を持つモデルの発言が残る
 
 ```text
 [道具] read_file {"path": "test_inventory.py"}
@@ -219,7 +220,7 @@ Claude Code も、Esc で止めると実行中の道具を取り消し、会話�
 >
 ```
 
-推論の文を次の要求に戻すことと、`think` で推論を切り替えることは、[作る機能](../../features.md) の F-09 にあたり、作っていない。
+`think` で推論を切り替えることは、[作る機能](../../features.md) の F-09 にあたり、作っていない。
 
 ### 走行の記録
 
@@ -234,6 +235,8 @@ F-01 の応答の件（[欄](../f-01-chat-and-trace/implementation.md#走行の�
 | 欄 | 中身 |
 |---|---|
 | `thinking` | 推論の文。無ければ空の文字列。`--show-thinking` によらず書く。止めた・誤りの応答では、それまでに届いた分 |
+
+要求の件の `body.messages` では、推論の文を持つモデルの発言に `thinking` が入る。
 
 - `edit_file` の見つけた段と、見つからなかったときの最も近い所は、`result`（モデルに返した文）に入る
 - Ctrl-C で止めた回では、まだ結果の無かった呼び出しにも道具の件を書く。`result` は `利用者が止めた`、`is_error` は `true`、`confirmed`・`seconds`・`preview` は `null` である
@@ -277,7 +280,7 @@ F-01 の応答の件（[欄](../f-01-chat-and-trace/implementation.md#走行の�
 | 末尾の改行の差分 | 末尾に改行が無い中身は、差分の最後の行の後に `\ No newline at end of file` を置く |
 | 止めたときの表示 | 応答の後の1行を `（止めた）`・`誤り: …` に変え、その次の行に、履歴をどう扱ったかを出す |
 | 下見の誤り | `confirmed` と `preview` は `null` |
-| 推論の文 | 仕様に無い。走行の記録に残し、`--show-thinking` で表示する。本文も呼び出しも無い応答では `（推論だけで終わった）` を出す（上の「推論の文」） |
+| 推論の文 | 仕様に無い。走行の記録に残し、`--show-thinking` で表示し、履歴に残して次の要求で戻す。本文も呼び出しも無い応答では `（推論だけで終わった）` を出す（上の「推論の文」） |
 
 ## ファイル
 
@@ -295,6 +298,8 @@ F-01 の応答の件（[欄](../f-01-chat-and-trace/implementation.md#走行の�
 | `local_coding_agent/loop/model_call.py` | 180 | 止めた・誤りの1行・推論の文を集めて記録し、表示する |
 | `local_coding_agent/loop/session.py` | 30 | 推論の文を表示するかの印（`show_thinking`） |
 | `local_coding_agent/model/chat.py` | 90 | 推論の文の断片（`ThinkingDelta`） |
+| `local_coding_agent/model/messages.py` | 120 | 推論の塊（`ThinkingBlock`） |
+| `local_coding_agent/model/ollama_messages.py` | 140 | 推論の塊を、モデルの発言の `thinking` に入れる |
 | `local_coding_agent/model/ollama.py` | 160 | `message.thinking` を読む |
 | `local_coding_agent/__main__.py` | 90 | `--show-thinking` |
 | `local_coding_agent/context/system_prompt.py` | 70 | 既定の指示 |
@@ -311,3 +316,4 @@ F-01 の応答の件（[欄](../f-01-chat-and-trace/implementation.md#走行の�
 - Aider の SEARCH/REPLACE の探し方（`replace_most_similar_chunk`・`find_similar_lines`）: https://github.com/Aider-AI/aider/blob/main/aider/coders/editblock_coder.py
 - Python の `difflib`（`unified_diff`・`SequenceMatcher.ratio`）: https://docs.python.org/3/library/difflib.html
 - Ollama の推論（`message.thinking`・`think` を入れないときはモデルの既定）: https://docs.ollama.com/capabilities/thinking
+- Ollama の道具の呼び出し（ストリーミングの例で、`thinking` を含めてモデルの発言を履歴に戻す）: https://docs.ollama.com/capabilities/tool-calling

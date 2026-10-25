@@ -1,7 +1,7 @@
 """会話の形。Claude の Messages API に揃え、発言を塊（content block）の並びで持つ。
 
-使う塊は、本文（text）・道具の呼び出し（tool_use）・道具の結果（tool_result）である。
-thinking の塊は、それを使う機能で足す。
+使う塊は、推論（thinking）・本文（text）・道具の呼び出し（tool_use）・道具の結果（tool_result）
+である。
 
 利用者の発言は、メタデータとして送った時刻（sent_at）を持つ。Messages API の発言には無い欄で、
 モデルは文しか読めないので、送る直前に本文の前へ文として入れる（metadata_text）。
@@ -13,6 +13,14 @@ from datetime import datetime
 from typing import Literal
 
 type Role = Literal["user", "assistant"]
+
+
+@dataclass(frozen=True)
+class ThinkingBlock:
+    """推論の塊。モデルの発言の先頭に入る。次の要求で、モデルに戻す。"""
+
+    thinking: str
+    type: Literal["thinking"] = "thinking"
 
 
 @dataclass(frozen=True)
@@ -45,7 +53,7 @@ class ToolResultBlock:
     type: Literal["tool_result"] = "tool_result"
 
 
-type ContentBlock = TextBlock | ToolUseBlock | ToolResultBlock
+type ContentBlock = ThinkingBlock | TextBlock | ToolUseBlock | ToolResultBlock
 
 
 @dataclass(frozen=True)
@@ -68,13 +76,17 @@ def assistant_text(text: str) -> Message:
     return Message(role="assistant", content=(TextBlock(text),))
 
 
-def assistant_message(text: str, tool_uses: Sequence[ToolUseBlock]) -> Message:
-    """本文と道具の呼び出しからなる、モデルの発言を作る。
+def assistant_message(
+    text: str, tool_uses: Sequence[ToolUseBlock], thinking: str = ""
+) -> Message:
+    """推論と本文と道具の呼び出しからなる、モデルの発言を作る。塊は、推論・本文・呼び出しの順。
 
-    呼び出しがあって本文が空なら、本文の塊を入れない。呼び出しが無ければ assistant_text と同じ。
+    推論が空なら、推論の塊を入れない。呼び出しがあって本文が空なら、本文の塊を入れない。
+    推論も呼び出しも無ければ assistant_text と同じ。
     """
+    thought = (ThinkingBlock(thinking),) if thinking else ()
     head = (TextBlock(text),) if text or not tool_uses else ()
-    return Message(role="assistant", content=(*head, *tool_uses))
+    return Message(role="assistant", content=(*thought, *head, *tool_uses))
 
 
 def tool_results(results: Sequence[ToolResultBlock]) -> Message:

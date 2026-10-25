@@ -4,6 +4,7 @@
 |---|---|
 | system prompt | 先頭の、role が system の発言 |
 | 道具の定義 | 要求の tools の1つ |
+| モデルの発言の thinking の塊 | その発言の thinking |
 | モデルの発言の tool_use の塊 | その発言の tool_calls の1つ |
 | 利用者の発言の tool_result の塊 | role が tool の発言1つ |
 | 発言のメタデータ（sent_at） | content の先頭の文 |
@@ -15,6 +16,7 @@ from local_coding_agent.model.chat import ToolDefinition
 from local_coding_agent.model.messages import (
     Message,
     TextBlock,
+    ThinkingBlock,
     ToolResultBlock,
     ToolUseBlock,
     metadata_text,
@@ -90,11 +92,18 @@ def _convert(message: Message, names: dict[str, str]) -> list[OllamaMessage]:
 
 
 def _assistant(message: Message) -> OllamaMessage:
-    """モデルの発言。本文の塊は content に、呼び出しの塊は tool_calls に入れる。"""
+    """モデルの発言。本文の塊は content に、推論の塊は thinking に、呼び出しの塊は tool_calls に入れる。
+
+    推論は、Ollama の道具の呼び出しの文書の例と同じく、次の要求でモデルに戻す。
+    """
+    thinking = "".join(
+        block.thinking for block in message.content if isinstance(block, ThinkingBlock)
+    )
     uses = [block for block in message.content if isinstance(block, ToolUseBlock)]
     calls = [_tool_call(index, use) for index, use in enumerate(uses)]
     converted: OllamaMessage = {"role": "assistant", "content": _content(message)}
-    return {**converted, "tool_calls": calls} if calls else converted
+    with_thinking = {**converted, "thinking": thinking} if thinking else converted
+    return {**with_thinking, "tool_calls": calls} if calls else with_thinking
 
 
 def _tool_call(index: int, use: ToolUseBlock) -> dict[str, object]:
