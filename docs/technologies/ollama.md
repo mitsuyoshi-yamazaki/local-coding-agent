@@ -43,8 +43,9 @@ Ollama は3種類の口を持つ。同じモデルを、どの形でも呼べる
 ## Apple Silicon の Mac での動き
 
 - macOS 14 以上で動く。Apple M 系の機械では CPU と GPU を使い、Intel の機械では CPU だけを使う
-- v0.40.0 以降、対応する構造のモデル（Qwen3.5・Gemma 4 など）は、Apple の機械学習の枠組み MLX を使う実行系で動く
+- v0.40.0 以降、対応する構造のモデル（Qwen3.5・Gemma 4 など）は、Apple の機械学習の枠組み MLX を使う実行系で動く。どちらの実行系で動いているかは、`ollama ps` の `RUNNER` の列に出る（`qwen3.5:9b` は `mlx`。実測）
 - **既定の文脈の長さに注意する**。GPU のメモリが 24 GiB 未満の機械では、既定の文脈の長さは 4k トークンで、エージェントには足りない。`OLLAMA_CONTEXT_LENGTH` で広げる
+- **文脈の長さを超えた会話の切り詰め**: Ollama は、`messages` を組み立てた文が文脈の長さを超えると、古い発言から落として収める。system の発言と最後の発言は残す。応答には、落としたことは出ない。要求の `truncate` に `false` を渡すと切り詰めない。ただし、形式が safetensors のモデル（MLX の実行系で動くもの）では、`truncate` によらず切り詰めない。`qwen3.5:9b` は、`ollama ps` の `CONTEXT` が 4096 のまま、28811 トークンの入力を処理し、会話の先頭の依頼に答えた（実測。[F-03 の計測の結果](../features/f-03-tool-loop/measurements.md)）。MLX の実行系の中で文脈の長さがどう使われるかは、確かめていない
 - 既定では、一度に1つの要求だけを処理する（`OLLAMA_NUM_PARALLEL`）
 
 ## 使い方
@@ -92,7 +93,7 @@ launchctl setenv OLLAMA_DEBUG 2
 | 決まるもの | 設定 | 既定 |
 |---|---|---|
 | 期限 | `OLLAMA_KEEP_ALIVE`: モデルをメモリに置いておく時間。モデルがメモリから外れると、KV キャッシュも消える。負の値で置いたまま、`0` で応答の後すぐ外す。要求の `keep_alive` の欄が、この設定より優先する | 5 分 |
-| 大きさの上限 | 文脈の長さ（`OLLAMA_CONTEXT_LENGTH`、またはアプリの設定）。今の値は、`ollama ps` の `CONTEXT` の列で見る | GPU のメモリによる（上の「Apple Silicon の Mac での動き」） |
+| 大きさの上限 | 文脈の長さ（`OLLAMA_CONTEXT_LENGTH`、またはアプリの設定）。今の値は、`ollama ps` の `CONTEXT` の列で見る。MLX の実行系では、文脈の長さを超えた入力も処理した（上の「Apple Silicon の Mac での動き」） | GPU のメモリによる（上の「Apple Silicon の Mac での動き」） |
 | 使うメモリの量 | `OLLAMA_KV_CACHE_TYPE`: KV キャッシュの数値を何ビットで持つか（量子化）。`f16`・`q8_0`（`f16` の約 1/2。精度がわずかに落ちる）・`q4_0`（約 1/4。精度が少し落ちる）。Flash Attention（文脈が長いときのメモリを減らす計算の方法）が効いているときだけ使え、全てのモデルに効く | `f16` |
 | 同時に持てる会話の数 | `OLLAMA_NUM_PARALLEL`: 1つのモデルが同時に処理する要求の数。要るメモリは、この数 × 文脈の長さで増える | 1 |
 
@@ -113,6 +114,7 @@ macOS のアプリでの設定のしかたは、上の `OLLAMA_DEBUG` と同じ�
 - Troubleshooting（ログの出力先・`OLLAMA_DEBUG=1`。2026-10-25）: https://docs.ollama.com/troubleshooting
 - `OLLAMA_DEBUG` の値と段（main のソース。2026-10-25）: https://github.com/ollama/ollama/blob/main/envconfig/config.go
 - trace の段で出す、解析器の入力と出力（main のソースの `ChatHandler`。2026-10-25）: https://github.com/ollama/ollama/blob/main/server/routes.go
+- 文脈の長さを超えた会話の切り詰め（`ChatHandler` の `truncate`・MLX のモデルでは切り詰めない。2026-10-25）: https://github.com/ollama/ollama/blob/main/server/routes.go ・ 古い発言から落とし、system の発言と最後の発言を残す（`chatPrompt`。2026-10-25）: https://github.com/ollama/ollama/blob/main/server/prompt.go ・ MLX のモデルの見分け方（`Model.IsMLX`。2026-10-25）: https://github.com/ollama/ollama/blob/main/server/images.go
 - API の基点（手元と ollama.com・手元のサーバでしかできない操作。2026-10-23）: https://docs.ollama.com/api/introduction
 - Cloud（ollama.com の API と API キー。2026-10-23）: https://docs.ollama.com/cloud
 - macOS（必要な版・Apple M 系と Intel）: https://docs.ollama.com/macos

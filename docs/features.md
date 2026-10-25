@@ -7,8 +7,8 @@
 | 機能 | 文書 |
 |---|---|
 | F-01 | [実装前の仕様](features/f-01-chat-and-trace/spec.md)・[実装した仕様と仕組み](features/f-01-chat-and-trace/implementation.md)・[計測の結果](features/f-01-chat-and-trace/measurements.md) |
-| F-02 | [実装前の仕様](features/f-02-system-prompt/spec.md)・[実装した仕様と仕組み](features/f-02-system-prompt/implementation.md) |
-| F-03 | [実装前の仕様](features/f-03-tool-loop/spec.md)・[実装した仕様と仕組み](features/f-03-tool-loop/implementation.md) |
+| F-02 | [実装前の仕様](features/f-02-system-prompt/spec.md)・[実装した仕様と仕組み](features/f-02-system-prompt/implementation.md)・[計測の結果](features/f-02-system-prompt/measurements.md) |
+| F-03 | [実装前の仕様](features/f-03-tool-loop/spec.md)・[実装した仕様と仕組み](features/f-03-tool-loop/implementation.md)・[計測の結果](features/f-03-tool-loop/measurements.md) |
 
 ## 第1部 中核
 
