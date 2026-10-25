@@ -78,7 +78,8 @@ launchctl setenv OLLAMA_DEBUG 2
 ### 前の要求の計算の使い回し（KV キャッシュ）
 
 - モデルは、入力のトークンを処理するときに、トークンごとに注意（attention）の計算の中間の結果を作る。これを KV キャッシュと呼ぶ。Ollama のサーバは、KV キャッシュを、モデルを載せたメモリに持つ
-- Ollama のサーバは、応答の後も KV キャッシュを残す。次の要求の先頭が前の要求と同じ文なら、その部分を処理し直さない（実測）。公式の文書には書かれていない
+- Ollama のサーバは、応答の後も KV キャッシュを残す。会話の続き（前の要求に、応答と次の発言を足した要求）を送ると、前の要求の部分を処理し直さない（実測。`qwen3.5:9b`）。公式の文書には書かれていない
+- 先頭の一部だけが前の要求と同じ要求（同じ system prompt で始めた別の会話など）では、その部分も処理し直すことがある（実測。`qwen3.5:9b`）。どこまで使い回すかの決まりは、公式の文書に無い
 - 使い回したかは、応答の欄には出ない。応答の `prompt_eval_count`（入力のトークン数）は使い回した分を含めた全体の数で、使い回すと `prompt_eval_duration`（入力の処理の時間）だけが短くなる（実測）
 - このエージェントは、system prompt を会話の間は変えず、前の回までの発言を送ったときのまま送るので、要求の先頭が毎回同じ文になる（[F-02](../features/f-02-system-prompt/implementation.md#モデルに届く文)）
 
@@ -97,7 +98,7 @@ macOS のアプリでの設定のしかたは、上の `OLLAMA_DEBUG` と同じ�
 
 | モデル | Ollama のライブラリでの名前 | 役 | 特徴 |
 |---|---|---|---|
-| Qwen3.5-9B | `qwen3.5:9b`（MLX 用の `qwen3.5:9b-mlx` もある） | 基準 | 9B（90 億パラメータ）。道具の呼び出し・推論の切り替え・画像の入力を持つ。Apache-2.0 |
+| Qwen3.5-9B | `qwen3.5:9b`（MLX 用の `qwen3.5:9b-mlx` もある） | 基準 | 9B（90 億パラメータ）。道具の呼び出し・推論の切り替え・画像の入力を持つ。32 層のうち 24 層が線形注意（linear attention）の層で、トークンごとの K/V の代わりに固定の大きさの状態を持つ。残りの 8 層が通常の注意の層。Apache-2.0 |
 | gpt-oss-20b | `gpt-oss:20b` | 推論の強さを試す用 | MoE（全体 21B のうち、1トークンごとに 3.6B だけを使う）。推論の強さを3段から選べる。Ollama での大きさは 14 GB で、メモリ 16 GB の機械ではぎりぎり載る。Apache-2.0 |
 
 ## 出典
@@ -119,5 +120,5 @@ macOS のアプリでの設定のしかたは、上の `OLLAMA_DEBUG` と同じ�
 - OpenAI compatibility: https://docs.ollama.com/api/openai-compatibility
 - Anthropic compatibility（対応・未対応の一覧）: https://docs.ollama.com/api/anthropic-compatibility ・ https://ollama.com/blog/claude
 - v0.40.0 のリリースノート（Apple Silicon で MLX が既定に）: https://github.com/ollama/ollama/releases/tag/v0.40.0
-- Qwen3.5-9B: https://huggingface.co/Qwen/Qwen3.5-9B ・ Ollama のライブラリ（2026-10-23） https://ollama.com/library/qwen3.5
+- Qwen3.5-9B: https://huggingface.co/Qwen/Qwen3.5-9B ・ 層の構成（`config.json` の `layer_types`。2026-10-25） https://huggingface.co/Qwen/Qwen3.5-9B/blob/main/config.json ・ Ollama のライブラリ（2026-10-23） https://ollama.com/library/qwen3.5
 - gpt-oss-20b: https://huggingface.co/openai/gpt-oss-20b ・ モデルカード https://arxiv.org/html/2508.10925v1 ・ Ollama のライブラリ（2026-10-23） https://ollama.com/library/gpt-oss
