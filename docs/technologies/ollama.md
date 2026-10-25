@@ -43,6 +43,38 @@ Ollama は3種類の口を持つ。同じモデルを、どの形でも呼べる
 - **既定の文脈の長さに注意する**。GPU のメモリが 24 GiB 未満の機械では、既定の文脈の長さは 4k トークンで、エージェントには足りない。`OLLAMA_CONTEXT_LENGTH` で広げる
 - 既定では、一度に1つの要求だけを処理する（`OLLAMA_NUM_PARALLEL`）
 
+## 使い方
+
+### ログの出力先
+
+| 動かし方 | 出力先 |
+|---|---|
+| macOS のアプリ | `~/.ollama/logs/server.log` |
+| 端末で `ollama serve` を走らせたとき | その端末 |
+
+ほかの OS（Linux・Windows）とコンテナでの出力先は、公式の Troubleshooting にある。
+
+エージェントが送った要求と受けた応答の中身は、エージェントの側の走行の記録にある（[F-01 の走行の記録](../features/f-01-chat-and-trace/implementation.md#走行の記録)）。Ollama のログは、Ollama のサーバの側で書かれる。
+
+### ログの段（レベル）の変え方
+
+環境変数 `OLLAMA_DEBUG` で変える。
+
+| 値 | 段 |
+|---|---|
+| 無し・`0` | info（既定） |
+| `1` | debug |
+| `2` | trace（debug より詳しい）。モデルに組み込みの解析器（parser）があるとき、モデルが出した生の文と、それを本文・推論の文・道具の呼び出しに分けた後の形が出る |
+
+macOS のアプリでは、環境変数を `launchctl` で設定し、アプリを起動し直す。
+
+```sh
+launchctl setenv OLLAMA_DEBUG 2
+# Ollama のアプリを終了して、起動し直す
+```
+
+戻すときは、`launchctl unsetenv OLLAMA_DEBUG` を実行し、アプリを起動し直す。端末で走らせるときは、`OLLAMA_DEBUG=2 ollama serve` のように、起動するコマンドに付ける。
+
 ## このリポジトリで使うモデル
 
 | モデル | Ollama のライブラリでの名前 | 役 | 特徴 |
@@ -54,7 +86,10 @@ Ollama は3種類の口を持つ。同じモデルを、どの形でも呼べる
 
 確かめた日は、断りが無ければ 2026-10-22。
 
-- FAQ（待ち受けのアドレス・手元で動くこと・インターネットを使うもの・クラウドの機能を切る設定・並列の数。2026-10-23）: https://docs.ollama.com/faq
+- FAQ（待ち受けのアドレス・手元で動くこと・インターネットを使うもの・クラウドの機能を切る設定・並列の数は 2026-10-23。macOS のアプリでの環境変数の設定は 2026-10-25）: https://docs.ollama.com/faq
+- Troubleshooting（ログの出力先・`OLLAMA_DEBUG=1`。2026-10-25）: https://docs.ollama.com/troubleshooting
+- `OLLAMA_DEBUG` の値と段（main のソース。2026-10-25）: https://github.com/ollama/ollama/blob/main/envconfig/config.go
+- trace の段で出す、解析器の入力と出力（main のソースの `ChatHandler`。2026-10-25）: https://github.com/ollama/ollama/blob/main/server/routes.go
 - API の基点（手元と ollama.com・手元のサーバでしかできない操作。2026-10-23）: https://docs.ollama.com/api/introduction
 - Cloud（ollama.com の API と API キー。2026-10-23）: https://docs.ollama.com/cloud
 - macOS（必要な版・Apple M 系と Intel）: https://docs.ollama.com/macos
