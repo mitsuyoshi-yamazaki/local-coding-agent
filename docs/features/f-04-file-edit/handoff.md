@@ -195,3 +195,12 @@ main 側のセッションが、人から来た問いと答え・直したこと
 - 検査: テスト146件・`ruff check`・`ruff format --check`・mypy が通った
 - main で直したこと（`bba9301`）: `tasks/f-04-file-edit/README.md` の起動のコマンドに `PYTHONPATH=../..` を足した。`pyproject.toml` が `package-mode = false` で、パッケージが `.venv` に入っていないため、写しの中から `python -m local_coding_agent` を呼ぶと `No module named local_coding_agent` になる（`-P` で作業ディレクトリを `sys.path` から外して確かめた）。前の写しを消してから写し直すことも書き添えた（`cp -R` は、写し先があるとその中に写す）
 - この引き継ぎとの食い違い: 読む順の 7. は `tools/lines.py` を「`read_file.run` と `edit_file` から呼ばれる」とするが、`write_file.plan`・`file_change._diff_lines`・`text_match`（`nearest`・`_line_spans`）も使う。`lines.py` の docstring も「read_file と edit_file が共に使う」のまま（直していない）
+
+### 問い: 課題 1 で回が終わったのに、`inventory.py` が直っていない（2026-10-25）
+
+- 持ち主が `qwen3.5:9b` で `test_inventory.py のテストが通るように、inventory.py を直せ` を試した（走行の記録 `20261025-205415`）。1歩目で `read_file` を2つ（`inventory.py`・`test_inventory.py`）呼び、2歩目の応答の後に `>` に戻った。`edit_file` は呼ばれていない
+- 2歩目の応答の件: `text` が空・`tool_calls` が空・`done_reason` は `stop`・`eval_count` は 211・`first_token_seconds` は `null`（画面の「最初の文字まで ?」）。2歩目の要求には、道具の定義の4つと、2つの結果が正しく入っていた
+- 答え: F-04 の道具の誤りではなく、モデルが本文も道具の呼び出しも出さずに応答を終えた。ハーネスは、道具を呼ばない応答を答えとして回を終える（F-03 の仕様のとおり）。出力の 211 トークンは、ハーネスが読まずに捨てている推論の欄（`message.thinking`。`model/ollama.py` の `_message_events` は `content` と `tool_calls` だけを読む）に出たと考えられる（推定。推論の文は記録に無い）
+- 推論の欄に出たものが、(a) 推論だけで終わったのか、(b) 道具の呼び出しを推論の文の中に書き、Ollama の解析器が推論の文として分けたのかは、記録からは分からない。確かめ方: Ollama のログの段を trace（`OLLAMA_DEBUG=2`）にして試し直し、生の出力を見る。または、2歩目の要求を `stream` を `false` にして `.tmp/f04-step2-body.json` に取り出したので、持ち主が `curl` で送り直し、`message.thinking` を見る（出力は回ごとに変わる）
+- その場の回り道: 履歴には2つの結果と空の応答が残っているので、次の回に `続けよ` などと打てば、モデルは読み直さずに `edit_file` を呼びうる
+- 直すか（本文も呼び出しも無い応答を表示で知らせる・推論の文を記録に残す、など）は、振る舞いの変更なので、持ち主と決める。推論の扱いは F-09
