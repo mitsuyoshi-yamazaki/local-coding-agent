@@ -37,6 +37,21 @@ LLM が出せるのは文だけで、自分ではファイルを読めず、コ�
 
 コードを直すときは、たとえば「テストを走らせる → 失敗の出力を読む → ファイルを編集する → もう一度テストを走らせる」が、このループの中で起きる。
 
+## ファイルの編集
+
+モデルにファイルを直させる道具には、モデルに何を出力させるかで、主に2つの形がある。
+
+| 形 | モデルが出力するもの | 例 |
+|---|---|---|
+| 丸ごと書く | 直した後のファイルの全体 | Aider の whole の形 |
+| 置き換える | 直す所の今の中身（置き換え元）と、直した後の中身。ハーネスが、ファイルの中から置き換え元を探して置き換える | Claude Code の Edit・Aider の SEARCH/REPLACE（diff の形） |
+
+丸ごと書く形は、数行の直しでもファイルの全体を出力させるので、遅く、出力のトークン数も多い。置き換える形は、変わる所だけを出力させれば済む。
+
+置き換える形は、置き換え元がファイルの中身と合わないと失敗する。合わない理由は、モデルがファイルの中身を覚え違えたか（内容の誤り）、読んだ中身を写すときに空白や字下げを違えたか（写し間違い）である。写し間違いを補うために、比べ方を段階的に緩めて探すハーネスがある（Aider・Codex）。Claude Code の Edit は、そのままの一致だけで置き換える。
+
+ファイルの変更は、実行してよいかを人に確かめる操作の典型である。書く前に差分を見せれば、人は何が変わるかを見て判断できる。
+
 ## ハーネスとモデルの分担
 
 モデルの周りで、ループ・道具の実行・履歴の管理・許可の判定を受け持つプログラムを、ハーネス（harness）と呼ぶ。エージェントは、モデルとハーネスの組である。
@@ -60,3 +75,7 @@ Claude Code の機能の多くはハーネスの側にある。だから、モ�
 - Messages API（`system` は発言の並びとは別の引数。2026-10-24）: https://platform.claude.com/docs/en/api/messages
 - Modifying system prompts（Claude Code が環境の知らせと CLAUDE.md を会話の中に入れること。2026-10-24）: https://code.claude.com/docs/en/agent-sdk/modifying-system-prompts
 - Ollama の Modelfile（`TEMPLATE` は、モデルに渡す文の全体の雛形。2026-10-24）: https://docs.ollama.com/modelfile
+- Aider の Edit formats（whole は全体を返すので遅く高くつく・diff は変わる所だけを返す。2026-10-25）: https://aider.chat/docs/more/edit-formats.html
+- Aider の SEARCH/REPLACE の探し方（そのまま → 字下げのずれ。2026-10-25）: https://github.com/Aider-AI/aider/blob/main/aider/coders/editblock_coder.py
+- Codex の `apply_patch` の探し方（そのまま → 行末の空白 → 行頭と行末の空白 → 記号の字。2026-10-25）: https://github.com/openai/codex/blob/main/codex-rs/apply-patch/src/seek_sequence.rs
+- Claude Code の Edit（今の中身にそのまま合うときに置き換える。2026-10-25）: https://code.claude.com/docs/en/tools-reference
