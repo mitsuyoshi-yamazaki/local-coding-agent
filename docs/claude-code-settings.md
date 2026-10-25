@@ -2,8 +2,8 @@
 
 このリポジトリで開発に使う Claude Code の設定を、[要件](requirements.md) からどう書き起こしたかを示す対応表である。書き起こしの手順は `.claude/skills/derive-settings/SKILL.md` にある。
 
-- Claude Code の版: 2.1.308。sandbox の除外（`sandbox.excludedCommands`）は 2.1.310 で確かめた
-- 公式の文書を確かめた日: 2026-10-24。sandbox の除外は 2026-10-25（[sandboxing](https://code.claude.com/docs/en/sandboxing)・[settings-reference](https://code.claude.com/docs/en/settings-reference) の `sandbox.excludedCommands`）
+- Claude Code の版: 2.1.308。sandbox の除外と `.git` への書き込みの拒否は 2.1.310 で確かめた
+- 公式の文書を確かめた日: 2026-10-24。sandbox の除外と `.git` への書き込みの拒否は 2026-10-25（[sandboxing](https://code.claude.com/docs/en/sandboxing) の Protected paths・[settings-reference](https://code.claude.com/docs/en/settings-reference) の `sandbox.excludedCommands` と `sandbox.filesystem.denyWrite`・[permission-modes](https://code.claude.com/docs/en/permission-modes) の Protected paths）
 
 ## 設定の置き場
 
@@ -23,7 +23,7 @@
 | 手段 | 何を縛るか | 限界 |
 |---|---|---|
 | permissions（deny・ask・allow） | 道具の呼び出しを、規則と照合して拒む・人に確かめる・確かめずに通す。照合は deny → ask → allow の順で、どの設定ファイルの deny も allow に勝つ。ask は auto mode でも人に確かめる | Bash の規則はコマンドの文字列で照合する。同じ操作を別の書き方（`/bin/rm`・`sh -c '…'`・Python から呼ぶ、など）にすると一致しない |
-| sandbox | Bash のコマンドとその子のプロセスを、OS（macOS では Seatbelt）で縛る。書き込みは作業ディレクトリと一時ディレクトリだけ。ネットワークは許したドメインだけ | Read・Edit・WebFetch などの道具には効かない。sandbox の外で走らせるコマンド（`excludedCommands`）には効かない。除外は、呼び出しの中の全てのコマンドが除外の型に一致したときだけ効き、`cd`・リダイレクト・コマンドの置き換えを含む呼び出しは sandbox の中に残る。削除は縛らない |
+| sandbox | Bash のコマンドとその子のプロセスを、OS（macOS では Seatbelt）で縛る。書き込みは作業ディレクトリと一時ディレクトリだけ。ネットワークは許したドメインだけ | Read・Edit・WebFetch などの道具には効かない。sandbox の外で走らせるコマンド（`excludedCommands`）には効かない。除外は、呼び出しの中の全てのコマンドが除外の型に一致したときだけ効き、`cd`・リダイレクト・コマンドの置き換えを含む呼び出しは sandbox の中に残る。作業ディレクトリの中の `.git` は、`hooks` と `config` だけを既定で守り（公式の文書の Protected paths）、worktree の `.git`（gitdir を指すファイル）は守らない（実測）。削除は縛らない |
 | `blockReadsOutsideWorkingDirectories` | Read・Grep・Glob が作業ディレクトリの外を読むのを拒む。sandbox と併せると、sandbox の中のコマンドもホームディレクトリなどを読めない | 利用者の設定で足した作業ディレクトリと、Claude Code が要る `~/.claude` の一部は読める |
 | hook（PreToolUse） | 道具の呼び出しの前にスクリプトを走らせ、入力を見て拒む | 登録した道具にしか効かない |
 | CLAUDE.md・rule | Claude への指示 | 強制力は無い |
@@ -80,7 +80,13 @@
 | allow | `git fetch`・`git pull`・`git ls-remote`・`git remote -v` |
 | sandbox の除外 | `git` は sandbox の外で走らせる（macOS の sandbox の中からは ssh の remote に届かないため） |
 | deny | `git -C …`・`git -c …`（`git -C . push` のような書き方で ask を避けられるため） |
+| deny・sandbox の `filesystem.denyWrite` | main の `.git` と、worktree の `.git`（`.worktrees/*/.git`。gitdir を指すファイル）に、Edit・Write の道具（deny の `Edit(/.git)`・`Edit(/.git/**)`・`Edit(/.worktrees/*/.git)`）からも、sandbox の中のコマンド（`denyWrite` の `./.git`・`./.worktrees/*/.git`）からも書かせない。`git` は sandbox の外で走り、`.git` の `config` と `hooks`、worktree の `.git` と `.git/worktrees/*/commondir` が指す先の `config` と `hooks` に書かれたプログラムを走らせるため。`git` 自体は sandbox の外で走るので、この拒否は `git` の動作に効かない |
 | CLAUDE.md | push しない。remote の操作は基本行わない |
+
+止められない部分:
+
+- 入れ子のリポジトリ（サブディレクトリの `.git/`）。ただし、そこで `git` を走らせるには `cd`（ask）か `git -C`（deny）が要る
+- `git --git-dir=…`・`git --exec-path=…` のように、sandbox の中から書ける場所（`.tmp/` など）の gitdir や実行ファイルを指す形も `git *` に一致し、sandbox の外で走る（試していない）。CLAUDE.md の「言い換えて規則を避けない」だけで守る
 
 ### デプロイと、外部へ影響を及ぼす操作の禁止
 
@@ -155,7 +161,7 @@
 
 ## 止まるかを確かめた操作
 
-2026-10-24 に、設定を置いたセッションで試した。`poetry` の行は、sandbox の除外を今の形にした 2026-10-25 に、同じセッションで試した。止まらなくても害の無い形で試している。
+2026-10-24 に、設定を置いたセッションで試した。`poetry` と `.git` の行は、2026-10-25 に、設定を今の形にした同じセッションで試した。止まらなくても害の無い形で試している（`.git` の行は、既にあるファイルに0バイトを足す `: >> <パス>` と、ファイルに無い文字列を置き換える Edit。通っても中身は変わらない）。
 
 | 操作 | 結果 |
 |---|---|
@@ -181,7 +187,12 @@
 | `poetry install && poetry run python -c "print('ok')"` | 呼び出しの全体が sandbox の中に残り、`poetry install` から走らなかった |
 | `poetry install` | sandbox の外で走った（入れるものは無かった） |
 | `poetry add --group dev --dry-run ruff` | sandbox の外で走った（ruff は入っているので何も足さなかった。`pyproject.toml` と `poetry.lock` は変わらなかった） |
+| `: >> .git/config`・`: >> .git/hooks/pre-commit.sample` | 拒否を足す前から、sandbox の保護のパスで止まった（operation not permitted） |
+| `: >> .worktrees/next/.git`・`: >> .worktrees/polish/.git` | 拒否を足す前は**止まらなかった**（書き込みで開けた）。`denyWrite` を足して止まった |
+| `: >> .git/worktrees/next/commondir` | `denyWrite` で止まった |
+| Edit で `.worktrees/next/.git`・`.git/description` | deny で止まった |
+| `git status --short` | 上の拒否を足したあとも、sandbox の外で動いた |
 
-試していないもの: `mv`・`git restore` などの、上で試したものと同じ形の deny。`cd` と `poetry` の ask（上の `poetry` の行は走ったが、確認が出たかは記録していない）。除外した `poetry` のコマンドに、書き換えたリポジトリの中のファイルを読ませて sandbox の外でコードを走らせる形（上の「道具の導入とモデルの取り込み」の止められない部分）。
+試していないもの: `mv`・`git restore` などの、上で試したものと同じ形の deny。`cd` と `poetry` の ask（上の `poetry` の行は走ったが、確認が出たかは記録していない）。除外した `poetry` のコマンドに、書き換えたリポジトリの中のファイルを読ませて sandbox の外でコードを走らせる形（上の「道具の導入とモデルの取り込み」の止められない部分）。`git --git-dir=…`・`git --exec-path=…` で、書ける場所を指す形（上の「git の remote の操作」の止められない部分）。
 
 許すドメインを空にしただけで外へ出られた原因は、確かめていない。許すドメインは、`allowedDomains` と、どの設定ファイルの `WebFetch(domain:…)` の allow とも合わさる。このリポジトリの allow にある `WebFetch` はドメインを指定しない形で、公式の文書では、この形は sandbox の中のコマンドが届く先を変えない。確かめるには `deniedDomains` を外して試す必要があり、そのあいだ sandbox の中のコマンドが外へ出られるので、行っていない。

@@ -87,6 +87,9 @@
       "Read(~/.config/gh/**)",
       "Read(~/Library/Keychains/**)",
       "Edit(/docs/inbox/**)",
+      "Edit(/.git)",
+      "Edit(/.git/**)",
+      "Edit(/.worktrees/*/.git)",
       "mcp__*",
       "Artifact",
       "ArtifactComments",
@@ -99,6 +102,9 @@
     "enabled": true,
     "allowUnsandboxedCommands": false,
     "excludedCommands": ["git *", "poetry install", "poetry add --group dev *"],
+    "filesystem": {
+      "denyWrite": ["./.git", "./.worktrees/*/.git"]
+    },
     "network": {
       "allowedDomains": [],
       "deniedDomains": ["*"]
