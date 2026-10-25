@@ -196,6 +196,31 @@ Claude Code も、Esc で止めると実行中の道具を取り消し、会話�
 | 道具の使い方 | 既存のファイルを直す前に `read_file` で読む。一部を直すときは `edit_file`、新しいファイルと全体の書き直しは `write_file`。`old_string` は `read_file` の結果から行番号とタブを除き、字下げと空白を含めてそのまま写し、1か所だけに合うよう前後の行を含める |
 | ハーネスが入れる情報 | 道具の結果の後の `（利用者がこの回を途中で止めた）` などの知らせ。止まる前に済んだ道具の結果は、そのまま効いている |
 
+### 推論の文
+
+推論を学習したモデルは、本文の前に推論の文を出す。Ollama は、推論の文を応答の `message.thinking` に、本文（`message.content`）と分けて載せる。要求に `think` を入れなければ、モデルの既定に従う。`qwen3.5:9b` は、`think` を入れなくても推論の文を返す（実測。[F-01 の計測の結果](../f-01-chat-and-trace/measurements.md)）。
+
+- `model/ollama.py` の `_message_events` は、`thinking` を推論の文の断片（`model/chat.py` の `ThinkingDelta`）に変える。同じ行に本文もあれば、推論の文を先に返す
+- `loop/model_call.py` の `receive` は、推論の文を集め、走行の記録の応答の件の `thinking` に入れる。履歴には足さないので、次の要求には入らない
+- 起動のときに `--show-thinking` を付けると、推論の文を届いたそばから表示し、前後を `[推論]` と `[推論ここまで]` の行で囲む。推論の文の途中で Ctrl-C を押したときも、`[推論ここまで]` を出してから `（止めた）` を出す
+- 「最初の文字まで」の時間（`first_token_seconds`）は、本文か道具の呼び出しが最初に届くまでで、推論の文は数えない
+- `loop/turn.py` の `run_turn` は、応答が道具を呼ばず、本文も空（空白と改行だけのときを含む）なら、数値の1行の後に `（推論だけで終わった）` を出して回を終える。履歴には、本文が空のモデルの発言が残る
+
+```text
+[道具] read_file {"path": "test_inventory.py"}
+→ 15 行
+
+[推論]
+`total_count` 関数の実装を見てみると、ループの中で `total = count` と書かれていますが、…
+[推論ここまで]
+
+[入力 1974 トークン・出力 106 トークン・最初の文字まで ?・全体 37.28 秒]
+（推論だけで終わった）
+>
+```
+
+推論の文を次の要求に戻すことと、`think` で推論を切り替えることは、[作る機能](../../features.md) の F-09 にあたり、作っていない。
+
 ### 走行の記録
 
 F-03 の道具の件（[欄](../f-03-tool-loop/implementation.md#走行の記録)）に、欄を1つ足した。
@@ -203,6 +228,12 @@ F-03 の道具の件（[欄](../f-03-tool-loop/implementation.md#走行の記録
 | 欄 | 中身 |
 |---|---|
 | `preview` | 実行の前に人に見せた下見（差分）。見せなかったら `null`（読むだけの道具・下見が誤りだったとき・止めた呼び出し） |
+
+F-01 の応答の件（[欄](../f-01-chat-and-trace/implementation.md#走行の記録)）にも、欄を1つ足した。
+
+| 欄 | 中身 |
+|---|---|
+| `thinking` | 推論の文。無ければ空の文字列。`--show-thinking` によらず書く。止めた・誤りの応答では、それまでに届いた分 |
 
 - `edit_file` の見つけた段と、見つからなかったときの最も近い所は、`result`（モデルに返した文）に入る
 - Ctrl-C で止めた回では、まだ結果の無かった呼び出しにも道具の件を書く。`result` は `利用者が止めた`、`is_error` は `true`、`confirmed`・`seconds`・`preview` は `null` である
@@ -231,7 +262,7 @@ F-03 の道具の件（[欄](../f-03-tool-loop/implementation.md#走行の記録
 
 ## 実装前の仕様との違い
 
-仕様の振る舞いは変えていない。仕様に書いていなかった細部は次のとおり。
+仕様の振る舞いは変えていない。仕様に書いていなかった細部と、足した振る舞いは次のとおり。
 
 | 点 | 実装 |
 |---|---|
@@ -246,6 +277,7 @@ F-03 の道具の件（[欄](../f-03-tool-loop/implementation.md#走行の記録
 | 末尾の改行の差分 | 末尾に改行が無い中身は、差分の最後の行の後に `\ No newline at end of file` を置く |
 | 止めたときの表示 | 応答の後の1行を `（止めた）`・`誤り: …` に変え、その次の行に、履歴をどう扱ったかを出す |
 | 下見の誤り | `confirmed` と `preview` は `null` |
+| 推論の文 | 仕様に無い。走行の記録に残し、`--show-thinking` で表示する。本文も呼び出しも無い応答では `（推論だけで終わった）` を出す（上の「推論の文」） |
 
 ## ファイル
 
@@ -259,11 +291,15 @@ F-03 の道具の件（[欄](../f-03-tool-loop/implementation.md#走行の記録
 | `local_coding_agent/tools/tool.py` | 50 | 道具の形に下見を足した |
 | `local_coding_agent/tools/default.py` | 10 | 既定の道具の組に2つを足した |
 | `local_coding_agent/loop/tool_call.py` | 160 | 下見を表示してから問う・止めたときの結果 |
-| `local_coding_agent/loop/turn.py` | 70 | 止めた回と誤りの回に、済んだ歩みまでを残す |
-| `local_coding_agent/loop/model_call.py` | 140 | 止めた・誤りの1行 |
+| `local_coding_agent/loop/turn.py` | 80 | 止めた回と誤りの回に、済んだ歩みまでを残す・推論だけで終わった応答の知らせ |
+| `local_coding_agent/loop/model_call.py` | 180 | 止めた・誤りの1行・推論の文を集めて記録し、表示する |
+| `local_coding_agent/loop/session.py` | 30 | 推論の文を表示するかの印（`show_thinking`） |
+| `local_coding_agent/model/chat.py` | 90 | 推論の文の断片（`ThinkingDelta`） |
+| `local_coding_agent/model/ollama.py` | 160 | `message.thinking` を読む |
+| `local_coding_agent/__main__.py` | 90 | `--show-thinking` |
 | `local_coding_agent/context/system_prompt.py` | 70 | 既定の指示 |
 | `tasks/f-04-file-edit/` | | 試すための小さなプロジェクトと、判定のコマンド |
-| `tests/` | | 探し方・2つの道具・ループの中の下見と問い・止めた回・REPL の次の回 |
+| `tests/` | | 探し方・2つの道具・ループの中の下見と問い・止めた回・REPL の次の回・推論の文（`test_thinking.py`） |
 
 ## 出典
 
@@ -274,3 +310,4 @@ F-03 の道具の件（[欄](../f-03-tool-loop/implementation.md#走行の記録
 - Codex の `apply_patch` の探し方（`seek_sequence`）: https://github.com/openai/codex/blob/main/codex-rs/apply-patch/src/seek_sequence.rs
 - Aider の SEARCH/REPLACE の探し方（`replace_most_similar_chunk`・`find_similar_lines`）: https://github.com/Aider-AI/aider/blob/main/aider/coders/editblock_coder.py
 - Python の `difflib`（`unified_diff`・`SequenceMatcher.ratio`）: https://docs.python.org/3/library/difflib.html
+- Ollama の推論（`message.thinking`・`think` を入れないときはモデルの既定）: https://docs.ollama.com/capabilities/thinking

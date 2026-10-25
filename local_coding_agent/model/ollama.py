@@ -1,7 +1,7 @@
 """Ollama の独自の API（/api/chat）との接続。
 
 送る形は model/ollama_messages.py で作る。応答は NDJSON（1行に1つの JSON）で流れてくるので、
-1行ずつ読んで、本文の断片・道具の呼び出し・終わりの知らせに変える。
+1行ずつ読んで、推論の文の断片・本文の断片・道具の呼び出し・終わりの知らせに変える。
 """
 
 import json
@@ -16,6 +16,7 @@ from local_coding_agent.model.chat import (
     ModelError,
     StreamEvent,
     TextDelta,
+    ThinkingDelta,
     ToolCall,
     ToolDefinition,
 )
@@ -34,7 +35,7 @@ STAT_KEYS = (
 
 
 def read_stream(lines: Iterable[bytes]) -> Iterator[StreamEvent]:
-    """NDJSON の行を読み、本文の断片・道具の呼び出し・終わりの知らせに変える。
+    """NDJSON の行を読み、推論の文と本文の断片・道具の呼び出し・終わりの知らせに変える。
 
     途中で error の行や、読めない行が届いたら ModelError を投げる。
     """
@@ -61,12 +62,16 @@ def _parse_line(raw: bytes) -> dict[str, object]:
 
 
 def _message_events(message: object) -> Iterator[StreamEvent]:
-    """1行の message から、本文の断片と道具の呼び出しを取り出す。
+    """1行の message から、推論の文の断片・本文の断片・道具の呼び出しを取り出す。
 
-    呼び出しがどの行に載るかは決まっていないので、全ての行から集める。
+    推論の文は、本文と別の欄（thinking）に載る。`think` を送らなくても、推論を学習した
+    モデルは返す。呼び出しがどの行に載るかは決まっていないので、全ての行から集める。
     """
     if not isinstance(message, dict):
         return
+    thinking = message.get("thinking", "")
+    if thinking:
+        yield ThinkingDelta(str(thinking))
     text = message.get("content", "")
     if text:
         yield TextDelta(str(text))

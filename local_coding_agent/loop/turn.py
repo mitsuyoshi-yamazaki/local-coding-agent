@@ -23,6 +23,8 @@ KEPT = "（済んだ歩みまでを履歴に残す）"
 # 済んだ歩みを残すときに、最後の発言の末尾に足す知らせ。モデルが読む
 CANCELLED_NOTE = "（利用者がこの回を途中で止めた）"
 ERROR_NOTE = "（誤りで、この回が途中で止まった）"
+# 本文も道具の呼び出しも無い応答で、回を終えたときの表示
+THINKING_ONLY = "（推論だけで終わった）"
 
 
 def run_turn(
@@ -43,6 +45,8 @@ def run_turn(
                 return _stopped(session, history, messages, outcome.status == "error")
             reply = assistant_message(outcome.text, outcome.tool_uses)
             if not outcome.tool_uses:
+                if not outcome.text.strip():
+                    session.output.write(THINKING_ONLY + "\n")
                 return (*messages, reply)
             results = run_tool_calls(session, outcome.tool_uses, turn, step)
             messages = (*messages, reply, tool_results(results.blocks))

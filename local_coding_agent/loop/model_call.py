@@ -1,24 +1,31 @@
 """ループの1歩: モデルを1回呼び、応答を流して表示し、走行の記録に書く。
 
 毎回、system prompt と道具の定義と会話の全体を送る。応答の本文は届いたそばから表示し、
-道具の呼び出しは集めて返す（実行は loop/tool_call.py）。
+道具の呼び出しは集めて返す（実行は loop/tool_call.py）。推論の文は集めて走行の記録に残し、
+--show-thinking のときだけ表示する。
 """
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, TextIO
 
 from local_coding_agent.loop.session import Session
 from local_coding_agent.model.chat import (
     ChatRequest,
     Done,
     ModelError,
+    StreamEvent,
     TextDelta,
+    ThinkingDelta,
     ToolCall,
 )
 from local_coding_agent.model.messages import Message, ToolUseBlock
 
 type Status = Literal["done", "cancelled", "error"]
+
+# 推論の文を表示するときに、前後に置く印の行
+THINKING_START = "[推論]"
+THINKING_END = "[推論ここまで]"
 
 
 @dataclass(frozen=True)
@@ -30,10 +37,12 @@ class Outcome:
     # 道具の呼び出し。id は必ず付いている
     tool_uses: tuple[ToolUseBlock, ...]
     done: Done | None
-    # 本文の断片か道具の呼び出しが、最初に届くまでの時間
+    # 本文の断片か道具の呼び出しが、最初に届くまでの時間。推論の文は数えない
     first_token_seconds: float | None
     total_seconds: float
     error: str | None = None
+    # 推論の文。履歴には足さない
+    thinking: str = ""
 
 
 def call_model(
@@ -58,17 +67,26 @@ def call_model(
 
 
 def receive(session: Session, request: ChatRequest, id_prefix: str) -> Outcome:
-    """応答を届いた順に表示し、本文・道具の呼び出し・時間を集める。
+    """応答を届いた順に表示し、推論の文・本文・道具の呼び出し・時間を集める。
 
+    推論の文は、session.show_thinking のときだけ、印の行で囲んで表示する。
     モデルの API が呼び出しに id を付けなければ、id_prefix と順から付ける（例: call_1_2_0）。
     """
     started = session.clock()
-    text = ""
+    text = thinking = ""
     calls: tuple[ToolCall, ...] = ()
     first: float | None = None
     done: Done | None = None
+    showing = False
     try:
         for event in session.model.stream(request):
+            if session.show_thinking:
+                # 書く前に決める。始めの印を書く途中で止まっても、終わりの印を出すため
+                was_showing, showing = showing, isinstance(event, ThinkingDelta)
+                _show_thinking(session.output, event, was_showing)
+            if isinstance(event, ThinkingDelta):
+                thinking += event.text
+                continue
             if first is None and not isinstance(event, Done):
                 first = session.clock() - started
             if isinstance(event, TextDelta):
@@ -80,16 +98,35 @@ def receive(session: Session, request: ChatRequest, id_prefix: str) -> Outcome:
             else:
                 done = event
     except KeyboardInterrupt:
-        return Outcome("cancelled", text, (), None, first, session.clock() - started)
+        elapsed = session.clock() - started
+        return Outcome("cancelled", text, (), None, first, elapsed, None, thinking)
     except ModelError as error:
         elapsed = session.clock() - started
-        return Outcome("error", text, (), None, first, elapsed, str(error))
+        return Outcome("error", text, (), None, first, elapsed, str(error), thinking)
+    finally:
+        # 推論の文の途中で止まったときも、終わりの印を出す
+        if showing:
+            session.output.write("\n" + THINKING_END + "\n")
     elapsed = session.clock() - started
     if done is None:
         message = "応答が終わりの行の前に切れた"
-        return Outcome("error", text, (), None, first, elapsed, message)
+        return Outcome("error", text, (), None, first, elapsed, message, thinking)
     uses = _tool_uses(calls, id_prefix)
-    return Outcome("done", text, uses, done, first, elapsed)
+    return Outcome("done", text, uses, done, first, elapsed, thinking=thinking)
+
+
+def _show_thinking(output: TextIO, event: StreamEvent, was_showing: bool) -> None:
+    """推論の文の断片を、印の行で囲んで表示する。was_showing は、前の断片が推論の文だったか。
+
+    始めの印の前には改行を出す。本文の後に推論の文が来ても、本文の行に印が付かないため。
+    """
+    if isinstance(event, ThinkingDelta):
+        if not was_showing:
+            output.write("\n" + THINKING_START + "\n")
+        output.write(event.text)
+        output.flush()
+    elif was_showing:
+        output.write("\n" + THINKING_END + "\n")
 
 
 def _tool_uses(calls: Sequence[ToolCall], id_prefix: str) -> tuple[ToolUseBlock, ...]:
@@ -109,6 +146,7 @@ def response_record(turn: int, step: int, outcome: Outcome) -> dict[str, object]
         "step": step,
         "status": outcome.status,
         "text": outcome.text,
+        "thinking": outcome.thinking,
         "tool_calls": [
             {"id": use.id, "name": use.name, "input": dict(use.input)}
             for use in outcome.tool_uses

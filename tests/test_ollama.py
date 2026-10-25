@@ -4,7 +4,7 @@ import urllib.error
 from datetime import datetime, timedelta, timezone
 from email.message import Message as Headers
 
-from local_coding_agent.model.chat import Done, ModelError, TextDelta
+from local_coding_agent.model.chat import Done, ModelError, TextDelta, ThinkingDelta
 from local_coding_agent.model.messages import (
     Message,
     TextBlock,
@@ -121,6 +121,31 @@ class ReadStreamTest(unittest.TestCase):
                     },
                 ),
             ],
+        )
+
+    def test_thinking_deltas_come_before_text(self) -> None:
+        body = ndjson(
+            '{"message": {"content": "", "thinking": "考え"}, "done": false}',
+            '{"message": {"content": "", "thinking": "る"}, "done": false}',
+            '{"message": {"content": "答え"}, "done": false}',
+            '{"message": {"content": ""}, "done": true}',
+        )
+        self.assertEqual(
+            list(read_stream(body)),
+            [
+                ThinkingDelta("考え"),
+                ThinkingDelta("る"),
+                TextDelta("答え"),
+                Done(done_reason=None, stats={}),
+            ],
+        )
+
+    def test_thinking_and_text_in_one_line(self) -> None:
+        body = ndjson(
+            '{"message": {"content": "答え", "thinking": "考え"}, "done": true}'
+        )
+        self.assertEqual(
+            list(read_stream(body))[:2], [ThinkingDelta("考え"), TextDelta("答え")]
         )
 
     def test_done_without_stats(self) -> None:

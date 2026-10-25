@@ -30,3 +30,5 @@ class Session:
     clock: Callable[[], float]
     # 発言に付ける、今の時刻（時差つき）
     now: Callable[[], datetime]
+    # 推論の文を表示するか（--show-thinking）。表示しなくても、走行の記録には残す
+    show_thinking: bool = False

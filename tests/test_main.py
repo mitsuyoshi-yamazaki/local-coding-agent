@@ -17,6 +17,17 @@ class ArgsTest(unittest.TestCase):
         args = parse_args(["--model", "m", "--system-prompt-file", "tasks/x.md"])
         self.assertEqual(args.system_prompt_file, Path("tasks/x.md"))
 
+    def test_show_thinking_is_off_by_default(self) -> None:
+        self.assertFalse(parse_args(["--model", "m"]).show_thinking)
+
+    def test_show_thinking_reaches_session(self) -> None:
+        with (
+            mock.patch("local_coding_agent.cli.repl.run") as run,
+            redirect_stdout(io.StringIO()),
+        ):
+            main(["--model", "m", "--show-thinking"])
+        self.assertTrue(run.call_args.args[0].show_thinking)
+
 
 class MainTest(unittest.TestCase):
     def test_instructions_file_and_environment_reach_session(self) -> None:

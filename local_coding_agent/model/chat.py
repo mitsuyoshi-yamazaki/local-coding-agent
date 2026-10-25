@@ -41,6 +41,13 @@ class TextDelta:
 
 
 @dataclass(frozen=True)
+class ThinkingDelta:
+    """流れてくる応答の、推論の文の断片。推論を学習したモデルが、本文の前に出す。"""
+
+    text: str
+
+
+@dataclass(frozen=True)
 class ToolCall:
     """応答の中の、道具の呼び出し1つ。"""
 
@@ -58,7 +65,7 @@ class Done:
     stats: Mapping[str, int] = field(default_factory=dict)
 
 
-type StreamEvent = TextDelta | ToolCall | Done
+type StreamEvent = TextDelta | ThinkingDelta | ToolCall | Done
 
 
 class ChatModel(Protocol):

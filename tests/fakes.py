@@ -118,6 +118,7 @@ def fake_session(
     trace: RecordingTrace | None = None,
     output: io.StringIO | None = None,
     cwd: Path = Path("/fake/cwd"),
+    show_thinking: bool = False,
 ) -> Session:
     """偽物で組んだ Session。作業ディレクトリは、既定では使わない場所にする。"""
     return Session(
@@ -130,4 +131,5 @@ def fake_session(
         trace=trace if trace is not None else RecordingTrace(),
         clock=ticking_clock(),
         now=ticking_now(START),
+        show_thinking=show_thinking,
     )

@@ -1,5 +1,5 @@
 """起動: python -m local_coding_agent --model <モデルのタグ> [--host <URL>]
-[--system-prompt-file <パス>]
+[--system-prompt-file <パス>] [--show-thinking]
 """
 
 import argparse
@@ -43,6 +43,11 @@ def parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         type=Path,
         help="指示の部分を、このファイルの中身に差し替える（環境の節は残る）",
     )
+    parser.add_argument(
+        "--show-thinking",
+        action="store_true",
+        help="推論の文を表示する（付けなくても、走行の記録には残る）",
+    )
     return parser.parse_args(argv)
 
 
@@ -70,6 +75,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         trace=trace,
         clock=time.monotonic,
         now=local_now,
+        show_thinking=args.show_thinking,
     )
     repl.run(session)
     return 0
