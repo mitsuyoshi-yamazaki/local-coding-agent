@@ -1,7 +1,7 @@
 """Ollama の独自の API（/api/chat）との接続。
 
-system prompt と会話の形（model/messages.py）を、送る直前に /api/chat の形へ変える。応答は
-NDJSON（1行に1つの JSON）で流れてくるので、1行ずつ読んで本文の断片と終わりの知らせに変える。
+送る形は model/ollama_messages.py で作る。応答は NDJSON（1行に1つの JSON）で流れてくるので、
+1行ずつ読んで、本文の断片・道具の呼び出し・終わりの知らせに変える。
 """
 
 import json
@@ -16,8 +16,11 @@ from local_coding_agent.model.chat import (
     ModelError,
     StreamEvent,
     TextDelta,
+    ToolCall,
+    ToolDefinition,
 )
-from local_coding_agent.model.messages import Message, metadata_text
+from local_coding_agent.model.messages import Message
+from local_coding_agent.model.ollama_messages import chat_request_body
 
 # 最後の行（done が true）に載る、モデルの側が数えたトークン数と時間（時間はナノ秒）
 STAT_KEYS = (
@@ -30,57 +33,67 @@ STAT_KEYS = (
 )
 
 
-def to_ollama_messages(
-    system: str, messages: Sequence[Message]
-) -> list[dict[str, str]]:
-    """system prompt と会話を、/api/chat の messages に変える。
-
-    /api/chat には system prompt の欄が無いので、先頭の system の発言にする（空なら入れない）。
-    発言ごとに、メタデータの文と本文の塊を、つないで1つの文字列にする。
-    """
-    head = [{"role": "system", "content": system}] if system else []
-    return [*head, *(_ollama_message(message) for message in messages)]
-
-
-def _ollama_message(message: Message) -> dict[str, str]:
-    text = "".join(block.text for block in message.content)
-    return {"role": message.role, "content": metadata_text(message) + text}
-
-
-def chat_request_body(
-    model: str, system: str, messages: Sequence[Message]
-) -> dict[str, object]:
-    """/api/chat へ送る JSON の全体を作る。"""
-    return {
-        "model": model,
-        "messages": to_ollama_messages(system, messages),
-        "stream": True,
-    }
-
-
 def read_stream(lines: Iterable[bytes]) -> Iterator[StreamEvent]:
-    """NDJSON の行を読み、本文の断片と、終わりの知らせに変える。
+    """NDJSON の行を読み、本文の断片・道具の呼び出し・終わりの知らせに変える。
 
-    途中で error の行や、JSON として読めない行が届いたら ModelError を投げる。
+    途中で error の行や、読めない行が届いたら ModelError を投げる。
     """
     for raw in lines:
         if not raw.strip():
             continue
-        try:
-            event = json.loads(raw)
-        except json.JSONDecodeError as error:
-            raise ModelError(f"応答の行が JSON として読めない: {raw!r}") from error
-        if not isinstance(event, dict):
-            raise ModelError(f"応答の行が JSON の object ではない: {raw!r}")
-        if "error" in event:
-            raise ModelError(f"Ollama が誤りを返した: {event['error']}")
-        message = event.get("message")
-        text = message.get("content", "") if isinstance(message, dict) else ""
-        if text:
-            yield TextDelta(str(text))
+        event = _parse_line(raw)
+        yield from _message_events(event.get("message"))
         if event.get("done") is True:
             yield _done(event)
             return
+
+
+def _parse_line(raw: bytes) -> dict[str, object]:
+    try:
+        event = json.loads(raw)
+    except json.JSONDecodeError as error:
+        raise ModelError(f"応答の行が JSON として読めない: {raw!r}") from error
+    if not isinstance(event, dict):
+        raise ModelError(f"応答の行が JSON の object ではない: {raw!r}")
+    if "error" in event:
+        raise ModelError(f"Ollama が誤りを返した: {event['error']}")
+    return event
+
+
+def _message_events(message: object) -> Iterator[StreamEvent]:
+    """1行の message から、本文の断片と道具の呼び出しを取り出す。
+
+    呼び出しがどの行に載るかは決まっていないので、全ての行から集める。
+    """
+    if not isinstance(message, dict):
+        return
+    text = message.get("content", "")
+    if text:
+        yield TextDelta(str(text))
+    calls = message.get("tool_calls")
+    if calls is None:
+        return
+    if not isinstance(calls, list):
+        raise ModelError(f"tool_calls が配列ではない: {calls!r}")
+    for call in calls:
+        yield _tool_call(call)
+
+
+def _tool_call(call: object) -> ToolCall:
+    """tool_calls の1つ（{"id": …, "function": {"name": …, "arguments": {…}}}）を読む。"""
+    function = call.get("function") if isinstance(call, dict) else None
+    if not isinstance(call, dict) or not isinstance(function, dict):
+        raise ModelError(f"道具の呼び出しの形が読めない: {call!r}")
+    name = function.get("name")
+    arguments = function.get("arguments", {})
+    if not isinstance(name, str) or not isinstance(arguments, dict):
+        raise ModelError(f"道具の呼び出しの形が読めない: {call!r}")
+    call_id = call.get("id")
+    return ToolCall(
+        id=call_id if isinstance(call_id, str) and call_id else None,
+        name=name,
+        input=arguments,
+    )
 
 
 def _done(event: dict[str, object]) -> Done:
@@ -112,10 +125,15 @@ class OllamaChat:
     host: str
     model: str
 
-    def build_request(self, system: str, messages: Sequence[Message]) -> ChatRequest:
+    def build_request(
+        self,
+        system: str,
+        messages: Sequence[Message],
+        tools: Sequence[ToolDefinition],
+    ) -> ChatRequest:
         return ChatRequest(
             url=f"{self.host.rstrip('/')}/api/chat",
-            body=chat_request_body(self.model, system, messages),
+            body=chat_request_body(self.model, system, messages, tools),
         )
 
     def stream(self, request: ChatRequest) -> Iterator[StreamEvent]:

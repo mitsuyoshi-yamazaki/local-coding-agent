@@ -13,9 +13,11 @@ from local_coding_agent.model.messages import (
 )
 from local_coding_agent.model.ollama import (
     OllamaChat,
-    chat_request_body,
     http_error_message,
     read_stream,
+)
+from local_coding_agent.model.ollama_messages import (
+    chat_request_body,
     to_ollama_messages,
 )
 
@@ -81,7 +83,7 @@ class ToOllamaMessagesTest(unittest.TestCase):
         )
 
     def test_request_body_streams_whole_history(self) -> None:
-        body = chat_request_body("qwen3.5:9b", "指示", [user_text("a")])
+        body = chat_request_body("qwen3.5:9b", "指示", [user_text("a")], [])
         self.assertEqual(
             body,
             {
@@ -182,7 +184,7 @@ class HttpErrorMessageTest(unittest.TestCase):
 class OllamaChatTest(unittest.TestCase):
     def test_builds_request_to_api_chat(self) -> None:
         chat = OllamaChat(host="http://localhost:11434/", model="gpt-oss:20b")
-        request = chat.build_request("", [user_text("a")])
+        request = chat.build_request("", [user_text("a")], [])
         self.assertEqual(request.url, "http://localhost:11434/api/chat")
         self.assertEqual(request.body["model"], "gpt-oss:20b")
 

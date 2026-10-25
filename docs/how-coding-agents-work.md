@@ -25,6 +25,8 @@ LLM が出せるのは文だけで、自分ではファイルを読めず、コ�
 
 モデルは道具を実行しない。実行するのは、いつも呼ぶ側のプログラムである。
 
+呼び出しと結果は、どちらも履歴に入る。Claude の Messages API では、モデルの発言の中の `tool_use` の塊が呼び出しで、id・道具の名前・入力を持つ。1回の応答に、呼び出しが複数入ることもある。プログラムは、次の利用者の発言に `tool_result` の塊を入れて結果を返し、どの呼び出しの結果かを id で示す。道具が失敗したときや、入力が道具の定義に合わないときも、誤りの印（`is_error`）を付けた結果として返す。モデルは、それを読んで呼び直せる。
+
 ## エージェントのループ
 
 エージェントは、モデルが道具を呼ぶ間、「モデルを呼ぶ → 道具を実行する → 結果を履歴に足す」を繰り返す。モデルが道具を呼ばずに本文だけを返したら、ループを終えて人に答えを見せる。
@@ -51,6 +53,7 @@ Claude Code の機能の多くはハーネスの側にある。だから、モ�
 確かめた日は、断りが無ければ 2026-10-22。
 
 - How tool use works（Anthropic）: https://platform.claude.com/docs/en/agents-and-tools/tool-use/how-tool-use-works
+- Handle tool calls（`tool_use` と `tool_result` の塊・`is_error`・入力の誤りも結果として返す。2026-10-24）: https://platform.claude.com/docs/en/agents-and-tools/tool-use/handle-tool-calls
 - Building effective agents（Anthropic）: https://www.anthropic.com/engineering/building-effective-agents
 - How Claude Code works: https://code.claude.com/docs/en/how-claude-code-works
 - How the agent loop works（Claude Agent SDK）: https://code.claude.com/docs/en/agent-sdk/agent-loop
