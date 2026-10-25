@@ -193,3 +193,18 @@ F-03 は、F-02 のファイル（`model/messages.py`・`model/chat.py`・`model
 ## 問いと答えの記録
 
 main 側のセッションが、人から来た問いと答え・直したことを足す。
+
+### 2026-10-25（F-03 を取り込んだ main のセッション）
+
+- **取り込み**: 持ち主が `git merge f-03-2` で取り込んだ（`c79aab7`。基点 `15eb9c4`）。衝突は `docs/technologies/ollama.md` の出典の2行だけで、両側を残して解いてあった。取り込んだ後の main で、テスト102件・Ruff・Ruff の整形・mypy が通る
+- **案内**: skill `merge-feature`（`49b641e` で足した）の手順で、動作の確かめ方・読む順・既存の実装からの変わりを示した。読む順は上の「読む順の案内（案）」のとおりで、ファイルと関数が今もあることを確かめた
+- **持ち主の指示: 「ブランチやstashを削除する必要は、今後もない」**。上の「人に消してもらうもの」の branch `f-03`・stash・`f-03-2` は消さない。人に頼むことに、branch と stash の削除を挙げない
+- **問い: 「ツールの仕様はシステムプロンプトに含まれている」は正しいか（今の実装と Ollama の仕様を分けて）**
+  - 今の実装: 含めていない。道具の定義は、要求の `tools` の欄に、system の発言とは別に毎回入れる（`loop/model_call.py` の `call_model`・`model/ollama_messages.py` の `chat_request_body`）。既定の指示に書いてあるのは、道具の名前と使い方の方針だけで、入力の形（JSON Schema）は書いていない
+  - Ollama の仕様: API の欄としては別だが、モデルに渡す文では system の塊の中に入る。`qwen3.5:9b` の Modelfile の雛形は `{{ .Prompt }}` だけで（ollama.com の library のページ）、文の組み立ては Ollama のソースの組み込みの renderer（`model/renderers/qwen35.go`）が行う。道具があると `<|im_start|>system` の塊を開き、`# Tools` の見出し・`<tools>` の中に道具の定義の JSON・呼び出しの書式（`<tool_call>`・`<function=…>`・`<parameter=…>`）の説明を書き、その後に、こちらの system prompt を続ける。前の呼び出しは同じ書式で、`tool` の発言は user の塊の中の `<tool_response>` で書く
+  - 確かめた範囲: Ollama の main のソース（2026-10-25）。公式の文書（Tool calling・Modelfile）には書かれていない。手元の Ollama の版で同じかと、gpt-oss の組み立て方は確かめていない
+- **問い: 「呼び出しの引数は Ollama が作る。型を強制する仕組みは無いので、Ollama が誤れば正常な呼び出しはできない」は正しいか**
+  - Ollama の仕様: 引数を作るのはモデルで、呼び出しも文（上の XML の書式。値は全て文）として出す。Ollama の解析器（`model/parsers/qwen35.go` が `qwen3coder.go` に任せる）が文を読み、`tool_calls` の `arguments`（JSON の object）にする。このとき要求の `tools` の定義の型を見て、値の文を型に変える（integer・number・boolean・object・array）。変えられなければ誤りにせず、文字列のまま渡す（型が1つだけのとき。boolean だけは false になる）。知らない道具の名前も誤りにせず、値は全て文字列になる。書式が壊れて読めなければ、流れの中に `{"error": …}` を返す（`server/routes.go`）。生成の段で型や書式を縛る仕組みは、見た範囲のソースと公式の文書には無い
+  - 今の実装: `{"error": …}` の行と、形の読めない呼び出しは `ModelError` になり、その回を捨てる（`model/ollama.py` の `_parse_line`・`_tool_call`）。読めた呼び出しは、実行の前に `execute` が名前を探し、`input_problem` で定義と照らす（必須の欄・型・下限）。合わなければ道具を走らせず、誤りの結果をモデルに返してループを続けるので、モデルは次の歩みで直して呼び直せる。定義に無い欄は照らさず無視する（`offset` の綴りを誤ると、既定の1行目から読む）
+  - 答え: 「作るのは Ollama」は誤りで、作るのはモデル、Ollama は文を JSON に直して型を合わせる。「型を強制する仕組みは無い」は生成の段では正しい。「誤れば正常な呼び出しはできない」は、その1回は実行されないが、型・必須の欄・名前の誤りは誤りの結果として返り、呼び直せる。回ごと失敗するのは、書式が壊れて Ollama が読めないとき
+  - 見る方法: `OLLAMA_DEBUG=2` の trace の段の `builtin parser input`・`builtin parser output` に、モデルが出した生の文と、分けた後の形が出る（F-02 の引き継ぎの「問いと答えの記録」）
