@@ -124,11 +124,11 @@ def response_record(turn: int, step: int, outcome: Outcome) -> dict[str, object]
 
 
 def summary(outcome: Outcome) -> str:
-    """応答の後に出す1行。"""
+    """応答の後に出す1行。止めた・誤りの回を履歴にどう残すかは、ループが次の行に出す。"""
     if outcome.status == "cancelled":
-        return "（止めた。この回は履歴に足さない）"
+        return "（止めた）"
     if outcome.status == "error":
-        return f"誤り: {outcome.error}（この回は履歴に足さない）"
+        return f"誤り: {outcome.error}"
     stats = outcome.done.stats if outcome.done else {}
     return (
         f"[入力 {stats.get('prompt_eval_count', '?')} トークン・"

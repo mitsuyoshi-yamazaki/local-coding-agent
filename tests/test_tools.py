@@ -154,15 +154,25 @@ class InputCheckTest(unittest.TestCase):
 
 
 class DefaultToolsTest(unittest.TestCase):
-    def test_read_only_tools(self) -> None:
+    def test_tools_and_which_change_files(self) -> None:
         self.assertEqual(
-            [tool.name for tool in DEFAULT_TOOLS], ["read_file", "list_directory"]
+            [(tool.name, tool.changes) for tool in DEFAULT_TOOLS],
+            [
+                ("read_file", False),
+                ("list_directory", False),
+                ("write_file", True),
+                ("edit_file", True),
+            ],
         )
-        self.assertFalse(any(tool.changes for tool in DEFAULT_TOOLS))
+
+    def test_changing_tools_have_preview(self) -> None:
+        for tool in DEFAULT_TOOLS:
+            with self.subTest(tool=tool.name):
+                self.assertEqual(tool.preview is not None, tool.changes)
 
     def test_find_tool(self) -> None:
         self.assertIs(find_tool(DEFAULT_TOOLS, "read_file"), read_file.TOOL)
-        self.assertIsNone(find_tool(DEFAULT_TOOLS, "write_file"))
+        self.assertIsNone(find_tool(DEFAULT_TOOLS, "run_command"))
 
 
 if __name__ == "__main__":

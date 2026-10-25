@@ -3,10 +3,12 @@ import unittest
 from collections.abc import Mapping
 from pathlib import Path
 
-from local_coding_agent.loop.turn import run_turn
+from local_coding_agent.loop.tool_call import STOPPED
+from local_coding_agent.loop.turn import CANCELLED_NOTE, ERROR_NOTE, run_turn
 from local_coding_agent.model.chat import Done, ModelError, TextDelta, ToolCall
 from local_coding_agent.model.messages import (
     Message,
+    TextBlock,
     ToolResultBlock,
     ToolUseBlock,
     assistant_message,
@@ -168,51 +170,128 @@ class ConfirmInLoopTest(unittest.TestCase):
         self.assertIsNone(run.trace.of_type("tool")[0]["confirmed"])
 
 
+def shown(arguments: Mapping[str, object], cwd: Path) -> str:
+    return "--- 差分"
+
+
+def not_found(arguments: Mapping[str, object], cwd: Path) -> str:
+    raise ToolError("置き換え元が見つからない")
+
+
+class PreviewInLoopTest(unittest.TestCase):
+    def test_preview_is_shown_before_asking(self) -> None:
+        tool = fake_tool("write", echo, changes=True, preview=shown)
+        run = Run([[call("write", "c"), STOP], [STOP]], (tool,), ("y",))
+        self.assertIn("[道具] write {}\n--- 差分\n→ 1 行\n", run.output.getvalue())
+        self.assertEqual(run.read_line.prompts, [PROMPT])
+        self.assertEqual(run.trace.of_type("tool")[0]["preview"], "--- 差分")
+
+    def test_refused_records_the_preview(self) -> None:
+        tool = fake_tool("write", interrupted, changes=True, preview=shown)
+        run = Run([[call("write", "c"), STOP], [STOP]], (tool,), ("n",))
+        record = run.trace.of_type("tool")[0]
+        self.assertEqual((record["confirmed"], record["preview"]), (False, "--- 差分"))
+
+    def test_preview_error_is_returned_without_asking(self) -> None:
+        tool = fake_tool("write", interrupted, changes=True, preview=not_found)
+        run = Run([[call("write", "c"), STOP], [STOP]], (tool,))
+        self.assertEqual(run.read_line.prompts, [])
+        self.assertEqual(
+            run.results(2), (ToolResultBlock("c", "置き換え元が見つからない", True),)
+        )
+        record = run.trace.of_type("tool")[0]
+        self.assertEqual((record["confirmed"], record["preview"]), (None, None))
+
+
 class CancelAndErrorTest(unittest.TestCase):
-    """止めた回と誤りの回は、その回の全体を履歴に足さない。"""
+    """止めた回と誤りの回は、済んだ歩みまでを履歴に残す。済んだ歩みが無ければ足さない。"""
 
     earlier = (user_text("前"), assistant_text("前の答え"))
+    request = user_text("依頼", START)
+    use = ToolUseBlock("c", "echo", {"text": "x"})
 
-    def assert_discarded(self, run: Run) -> None:
-        self.assertEqual(run.history, self.earlier)
+    def kept(self, *last: ToolResultBlock | TextBlock) -> tuple[Message, ...]:
+        """依頼と、echo を呼んだ1歩を残した履歴。最後の発言の塊は last。"""
+        reply = assistant_message("", [self.use])
+        return (*self.earlier, self.request, reply, Message("user", last))
 
-    def test_ctrl_c_during_first_model_call(self) -> None:
+    def test_ctrl_c_during_first_model_call_keeps_nothing(self) -> None:
         run = Run([[TextDelta("途中"), KeyboardInterrupt()]], history=self.earlier)
-        self.assert_discarded(run)
+        self.assertEqual(run.history, self.earlier)
         self.assertEqual(run.trace.of_type("response")[0]["status"], "cancelled")
+        self.assertIn("（止めた）\n（この回は履歴に足さない）\n", run.output.getvalue())
 
-    def test_ctrl_c_during_second_model_call(self) -> None:
+    def test_model_error_in_first_call_keeps_nothing(self) -> None:
+        run = Run([[ModelError("繋がらない")]], history=self.earlier)
+        self.assertEqual(run.history, self.earlier)
+        self.assertIn(
+            "誤り: 繋がらない\n（この回は履歴に足さない）\n", run.output.getvalue()
+        )
+
+    def test_ctrl_c_during_second_model_call_keeps_finished_steps(self) -> None:
         run = Run(
-            [[call("echo"), STOP], [TextDelta("途中"), KeyboardInterrupt()]],
+            [
+                [call("echo", "c", text="x"), STOP],
+                [TextDelta("途中"), KeyboardInterrupt()],
+            ],
             history=self.earlier,
         )
-        self.assert_discarded(run)
-        self.assertIn("（止めた。この回は履歴に足さない）", run.output.getvalue())
+        done = ToolResultBlock("c", "echo: x")
+        self.assertEqual(run.history, self.kept(done, TextBlock(CANCELLED_NOTE)))
+        self.assertIn(
+            "（止めた）\n（済んだ歩みまでを履歴に残す）\n", run.output.getvalue()
+        )
 
-    def test_ctrl_c_during_tool(self) -> None:
-        tool = fake_tool("slow", interrupted)
-        run = Run([[call("slow"), STOP], [STOP]], (tool,), history=self.earlier)
-        self.assert_discarded(run)
+    def test_model_error_in_second_call_keeps_finished_steps(self) -> None:
+        run = Run(
+            [[call("echo", "c", text="x"), STOP], [ModelError("繋がらない")]],
+            history=self.earlier,
+        )
+        done = ToolResultBlock("c", "echo: x")
+        self.assertEqual(run.history, self.kept(done, TextBlock(ERROR_NOTE)))
+        self.assertIn(
+            "誤り: 繋がらない\n（済んだ歩みまでを履歴に残す）\n", run.output.getvalue()
+        )
+
+    def test_ctrl_c_during_tool_stops_the_rest(self) -> None:
+        slow = fake_tool("slow", interrupted)
+        run = Run(
+            [[call("echo", "a"), call("slow", "b"), call("echo", "c"), STOP], [STOP]],
+            (ECHO, slow),
+            history=self.earlier,
+        )
         self.assertEqual(len(run.model.sent), 1)
-        self.assertIn("（止めた。この回は履歴に足さない）", run.output.getvalue())
+        self.assertEqual(
+            run.history[-1].content,
+            (
+                ToolResultBlock("a", "echo: "),
+                ToolResultBlock("b", STOPPED, True),
+                ToolResultBlock("c", STOPPED, True),
+                TextBlock(CANCELLED_NOTE),
+            ),
+        )
+        results = [record["result"] for record in run.trace.of_type("tool")]
+        self.assertEqual(results, ["echo: ", STOPPED, STOPPED])
+        self.assertIn(
+            "（止めた）\n（済んだ歩みまでを履歴に残す）\n", run.output.getvalue()
+        )
 
     def test_ctrl_c_during_confirm(self) -> None:
         tool = fake_tool("write", echo, changes=True)
         run = Run(
-            [[call("write"), STOP], [STOP]],
+            [[call("write", "c"), STOP], [STOP]],
             (tool,),
             (KeyboardInterrupt(),),
             self.earlier,
         )
-        self.assert_discarded(run)
         self.assertEqual(len(run.model.sent), 1)
-
-    def test_model_error_in_second_call(self) -> None:
-        run = Run(
-            [[call("echo"), STOP], [ModelError("繋がらない")]], history=self.earlier
+        self.assertEqual(
+            run.history[-2], assistant_message("", [ToolUseBlock("c", "write", {})])
         )
-        self.assert_discarded(run)
-        self.assertIn("誤り: 繋がらない", run.output.getvalue())
+        self.assertEqual(
+            run.history[-1].content,
+            (ToolResultBlock("c", STOPPED, True), TextBlock(CANCELLED_NOTE)),
+        )
 
 
 class OutputAndTraceTest(unittest.TestCase):
@@ -256,6 +335,7 @@ class OutputAndTraceTest(unittest.TestCase):
                 "result": "echo: x",
                 "is_error": False,
                 "seconds": 0.5,
+                "preview": None,
             },
         )
 

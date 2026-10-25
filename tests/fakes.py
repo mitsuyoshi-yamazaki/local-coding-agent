@@ -100,6 +100,7 @@ def fake_tool(
     run: Callable[[ToolInput, Path], str],
     changes: bool = False,
     required: Sequence[str] = (),
+    preview: Callable[[ToolInput, Path], str] | None = None,
 ) -> Tool:
     """偽物の道具。入力の欄は全て文字列とする。"""
     schema = {
@@ -107,7 +108,7 @@ def fake_tool(
         "properties": {field: {"type": "string"} for field in required},
         "required": list(required),
     }
-    return Tool(ToolDefinition(name, f"{name} の説明", schema), changes, run)
+    return Tool(ToolDefinition(name, f"{name} の説明", schema), changes, run, preview)
 
 
 def fake_session(
@@ -116,13 +117,14 @@ def fake_session(
     read_line: Callable[[str], str] | None = None,
     trace: RecordingTrace | None = None,
     output: io.StringIO | None = None,
+    cwd: Path = Path("/fake/cwd"),
 ) -> Session:
-    """偽物で組んだ Session。作業ディレクトリは、使わない場所にする。"""
+    """偽物で組んだ Session。作業ディレクトリは、既定では使わない場所にする。"""
     return Session(
         model=model,
         system="指示",
         tools=tools,
-        cwd=Path("/fake/cwd"),
+        cwd=cwd,
         read_line=read_line if read_line is not None else ScriptedLines(),
         output=output if output is not None else io.StringIO(),
         trace=trace if trace is not None else RecordingTrace(),

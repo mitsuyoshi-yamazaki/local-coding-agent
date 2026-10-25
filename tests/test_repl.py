@@ -3,8 +3,9 @@ import unittest
 from datetime import datetime, timedelta
 
 from local_coding_agent.cli import repl
-from local_coding_agent.model.chat import Done, ModelError, TextDelta
-from local_coding_agent.model.messages import assistant_text, user_text
+from local_coding_agent.loop.turn import ERROR_NOTE
+from local_coding_agent.model.chat import Done, ModelError, TextDelta, ToolCall
+from local_coding_agent.model.messages import TextBlock, assistant_text, user_text
 from tests.fakes import (
     START,
     RecordingTrace,
@@ -64,6 +65,21 @@ class HistoryTest(unittest.TestCase):
         self.assertEqual(trace.records[1]["status"], "cancelled")
         self.assertEqual(trace.records[1]["text"], "昔々")
         self.assertIn("止めた", output)
+
+    def test_finished_steps_of_stopped_turn_go_to_next_turn(self) -> None:
+        model, _, _ = run_repl(
+            ["読んで", "続けて"],
+            [
+                [ToolCall(id="c", name="nope", input={}), STOP],
+                [ModelError("繋がらない")],
+                [TextDelta("はい"), STOP],
+            ],
+        )
+        # 依頼・呼び出し・結果と知らせ・次の依頼
+        sent = model.sent[2]
+        self.assertEqual(len(sent), 4)
+        self.assertEqual(sent[2].content[-1], TextBlock(ERROR_NOTE))
+        self.assertEqual(sent[3], user_text("続けて", at(1)))
 
     def test_error_turn_is_not_added(self) -> None:
         model, trace, output = run_repl(
