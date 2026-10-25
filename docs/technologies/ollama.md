@@ -75,6 +75,24 @@ launchctl setenv OLLAMA_DEBUG 2
 
 戻すときは、`launchctl unsetenv OLLAMA_DEBUG` を実行し、アプリを起動し直す。端末で走らせるときは、`OLLAMA_DEBUG=2 ollama serve` のように、起動するコマンドに付ける。
 
+### 前の要求の計算の使い回し（KV キャッシュ）
+
+- モデルは、入力のトークンを処理するときに、トークンごとに注意（attention）の計算の中間の結果を作る。これを KV キャッシュと呼ぶ。Ollama のサーバは、KV キャッシュを、モデルを載せたメモリに持つ
+- Ollama のサーバは、応答の後も KV キャッシュを残す。次の要求の先頭が前の要求と同じ文なら、その部分を処理し直さない（実測）。公式の文書には書かれていない
+- 使い回したかは、応答の欄には出ない。応答の `prompt_eval_count`（入力のトークン数）は使い回した分を含めた全体の数で、使い回すと `prompt_eval_duration`（入力の処理の時間）だけが短くなる（実測）
+- このエージェントは、system prompt を会話の間は変えず、前の回までの発言を送ったときのまま送るので、要求の先頭が毎回同じ文になる（[F-02](../features/f-02-system-prompt/implementation.md#モデルに届く文)）
+
+公式の文書には、KV キャッシュの期限や大きさを直接決める設定は無い。次の設定が、間接に決める。
+
+| 決まるもの | 設定 | 既定 |
+|---|---|---|
+| 期限 | `OLLAMA_KEEP_ALIVE`: モデルをメモリに置いておく時間。モデルがメモリから外れると、KV キャッシュも消える。負の値で置いたまま、`0` で応答の後すぐ外す。要求の `keep_alive` の欄が、この設定より優先する | 5 分 |
+| 大きさの上限 | 文脈の長さ（`OLLAMA_CONTEXT_LENGTH`、またはアプリの設定）。今の値は、`ollama ps` の `CONTEXT` の列で見る | GPU のメモリによる（上の「Apple Silicon の Mac での動き」） |
+| 使うメモリの量 | `OLLAMA_KV_CACHE_TYPE`: KV キャッシュの数値を何ビットで持つか（量子化）。`f16`・`q8_0`（`f16` の約 1/2。精度がわずかに落ちる）・`q4_0`（約 1/4。精度が少し落ちる）。Flash Attention（文脈が長いときのメモリを減らす計算の方法）が効いているときだけ使え、全てのモデルに効く | `f16` |
+| 同時に持てる会話の数 | `OLLAMA_NUM_PARALLEL`: 1つのモデルが同時に処理する要求の数。要るメモリは、この数 × 文脈の長さで増える | 1 |
+
+macOS のアプリでの設定のしかたは、上の `OLLAMA_DEBUG` と同じ（`launchctl setenv` して、アプリを起動し直す）。
+
 ## このリポジトリで使うモデル
 
 | モデル | Ollama のライブラリでの名前 | 役 | 特徴 |
@@ -86,14 +104,14 @@ launchctl setenv OLLAMA_DEBUG 2
 
 確かめた日は、断りが無ければ 2026-10-22。
 
-- FAQ（待ち受けのアドレス・手元で動くこと・インターネットを使うもの・クラウドの機能を切る設定・並列の数は 2026-10-23。macOS のアプリでの環境変数の設定は 2026-10-25）: https://docs.ollama.com/faq
+- FAQ（待ち受けのアドレス・手元で動くこと・インターネットを使うもの・クラウドの機能を切る設定・並列の数は 2026-10-23。macOS のアプリでの環境変数の設定・モデルをメモリに置いておく時間・並列とメモリ・Flash Attention・KV キャッシュの量子化は 2026-10-25）: https://docs.ollama.com/faq
 - Troubleshooting（ログの出力先・`OLLAMA_DEBUG=1`。2026-10-25）: https://docs.ollama.com/troubleshooting
 - `OLLAMA_DEBUG` の値と段（main のソース。2026-10-25）: https://github.com/ollama/ollama/blob/main/envconfig/config.go
 - trace の段で出す、解析器の入力と出力（main のソースの `ChatHandler`。2026-10-25）: https://github.com/ollama/ollama/blob/main/server/routes.go
 - API の基点（手元と ollama.com・手元のサーバでしかできない操作。2026-10-23）: https://docs.ollama.com/api/introduction
 - Cloud（ollama.com の API と API キー。2026-10-23）: https://docs.ollama.com/cloud
 - macOS（必要な版・Apple M 系と Intel）: https://docs.ollama.com/macos
-- Context length（既定の文脈の長さ）: https://docs.ollama.com/context-length
+- Context length（既定の文脈の長さ。変え方と `ollama ps` での見方は 2026-10-25）: https://docs.ollama.com/context-length
 - Chat（発言の欄と、`role` の値。2026-10-24）: https://docs.ollama.com/api/chat
 - Modelfile（`TEMPLATE`・`SYSTEM`。2026-10-24）: https://docs.ollama.com/modelfile
 - Tool calling: https://docs.ollama.com/capabilities/tool-calling
