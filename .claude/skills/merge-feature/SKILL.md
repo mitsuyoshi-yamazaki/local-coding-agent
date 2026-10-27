@@ -1,6 +1,6 @@
 ---
 name: merge-feature
-description: worktree 側で実装が済んだ機能の branch を main に取り込み（要れば衝突を解き）、人が確かめるための案内（動作の確かめ方・読む順・既存の実装からの変わり）を示す。main 側のセッションで、人が /merge-feature <branch> で呼ぶ
+description: worktree 側で実装が済んだ機能の branch を main に取り込み（要れば衝突を解き）、人が確かめるための案内（動作の確かめ方・読む順・既存の実装からの変わり）を機能のディレクトリの guide.md に書いて示す。main 側のセッションで、人が /merge-feature <branch> で呼ぶ
 argument-hint: <branch>
 arguments: [branch]
 disable-model-invocation: true
@@ -64,9 +64,16 @@ CLAUDE.md の「Python の環境」の4つ（unittest・`ruff check`・`ruff for
 - `docs/progress.md` を書き直す（CLAUDE.md の「記録」）: 「機能ごとの段」の実装を済にする・「現在の状況」の確認中の機能・「人を待っていること」（読む・試す）・「経過」に足す。書き直したら、CLAUDE.md の main 側のとおり、`.worktrees/next/` と `.worktrees/polish/` へ写しを置く
 - 持ち主のメモ `docs/features/f-NN-<機能名>/memo.md` を、`touch` で空のファイルとして作る。`.gitignore` で git に入れないので、取り込みでは届かず、main 側で作る。あれば中身を変えない（中身は持ち主が書く）
 
-## 5. 人に示す
+## 5. 確かめる案内を書き、人に示す
 
-次の3つを、この順で示す。handoff.md を写すだけにせず、取り込んだ後のコードと差分で確かめる。handoff.md と食い違えば、コードと差分を正とし、食い違いも示す。ファイルと関数は、行へのリンクで示す。
+次の3つを、この順で、確かめる案内 `docs/features/f-NN-<機能名>/guide.md` に書き、返答でも示す。handoff.md を写すだけにせず、取り込んだ後のコードと差分で確かめる。handoff.md と食い違えば、コードと差分を正とし、食い違いも示す（食い違いは返答で示し、guide.md には正しい方だけを書く）。ファイルと関数は、行へのリンクで示す。行の番号は Read で確かめる。
+
+- guide.md の始めに、何の案内か・基点と取り込んだ commit・出所（`spec.md`・`implementation.md`・`handoff.md`）と、行の番号は guide.md を最後に直した commit のコードのものであることを書く。形は F-05 の `docs/features/f-05-run-command/guide.md` に揃える
+- リンクのパスは、guide.md の中では guide.md からの相対パス（`../../../local_coding_agent/…#L12`）、返答の中ではリポジトリの根からのパスにする
+- guide.md に書くのは3つだけで、取り込みの結果（検査・記録）と人に頼むことは書かない（handoff.md と返答に書く）
+- `docs/features.md` の表の、その機能の行に、`[確かめる案内](features/f-NN-<機能名>/guide.md)` を足す
+- もう guide.md があれば（取り込み済みで呼んだときなど）、今のコードと差分で確かめ直し、違う所を直す
+- commit する（`docs: F-NN の確かめる案内を書く`）
 
 ### 動作の確かめ方
 
@@ -97,3 +104,5 @@ CLAUDE.md の「Python の環境」の4つ（unittest・`ruff check`・`ruff for
 - 衝突を解いて、branch の実装から変えた所
 
 最後に、人に頼むこと（push など、Claude Code が行わない操作のコマンド）を並べる。branch と stash の削除は、handoff.md に書いてあっても頼まない（CLAUDE.md の「削除」）。この後に来た人の問いには handoff.md を読んで答え、問いと答え・直したことを「問いと答えの記録」に足す（CLAUDE.md の main 側）。
+
+guide.md は、中身が変わるたびに追従させる。main で直したことで、動作の確かめ方・読む順・既存の実装からの変わりのどれかが変われば（関数や行が動いた・起動や判定のコマンドが変わった・振る舞いが変わった・試す材料が変わった）、guide.md も直し、直しと同じ commit に入れる。guide.md が今のコードと食い違うと分かったときも直す。行の番号は、直すたびに Read で確かめ直す。
