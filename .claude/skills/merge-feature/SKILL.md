@@ -26,7 +26,7 @@ CLAUDE.md の「main と worktree の分担」の、main 側の「worktree 側�
 基点を控える。
 
 - まだ取り込んでいない（`git log --oneline main..$branch` に commit がある）: `git rev-parse --short HEAD` の値が基点
-- もう取り込んである（上が空）: `git log --merges --oneline -1 --grep "Merge branch '$branch'"` で取り込んだ commit を探し、`git rev-parse --short <その commit>^1` の値を基点にする。3. の「取り込む」と 4. の記録は飛ばし、下の確かめと案内（5.）だけを行う。見つからなければ、基点を人に問う
+- もう取り込んである（上が空）: `git log --merges --oneline -1 --grep "Merge branch '$branch'"` で取り込んだ commit を探し、`git rev-parse --short <その commit>^1` の値を基点にする。3. の「取り込む」と 4. の検査・記録は飛ばし（記録のうち、memo.md を作ることだけは行う）、下の確かめと案内（5.）を行う。見つからなければ、基点を人に問う
   - 衝突の解き方を `git show --remerge-diff <その commit>` で確かめる。git が自動で合わせた結果（衝突の印を含む）と、実際に commit した結果の差が出る。出たファイルが、衝突した（または取り込みのときに手で直した）ファイルである。`git log -p --left-right` で両側が触ったファイルを見るだけでは、どこが衝突したかを取り違える（F-03 で取り違えた）
   - 解いた所で main の変更が落ちていれば（3. の方針に合わなければ）、main で直して commit し（`docs: …`・`fix: …`）、handoff.md の「問いと答えの記録」に、衝突したファイル・解き方・直したことを書く。振る舞いが変わる直しは、直す前に人に示す
 
@@ -62,6 +62,7 @@ CLAUDE.md の「Python の環境」の4つ（unittest・`ruff check`・`ruff for
 
 - handoff.md の「問いと答えの記録」に、取り込みの節を足す: 日付・取り込んだ commit・基点・衝突したファイルと解き方・検査の結果・main で直したこと。commit する（`docs: …`）
 - `docs/progress.md` を書き直す（CLAUDE.md の「記録」）: 「機能ごとの段」の実装を済にする・「現在の状況」の確認中の機能・「人を待っていること」（読む・試す）・「経過」に足す。書き直したら、CLAUDE.md の main 側のとおり、`.worktrees/next/` と `.worktrees/polish/` へ写しを置く
+- 持ち主のメモ `docs/features/f-NN-<機能名>/memo.md` を、`touch` で空のファイルとして作る。`.gitignore` で git に入れないので、取り込みでは届かず、main 側で作る。あれば中身を変えない（中身は持ち主が書く）
 
 ## 5. 人に示す
 

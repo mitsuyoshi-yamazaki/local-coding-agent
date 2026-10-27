@@ -42,6 +42,7 @@ docs/ の説明の文書を書くときの規則である。受け渡しのフ�
   - `implementation.md`: 実装した後の、実際に実装された仕様と仕組み
   - `measurements.md`: 計測の結果（あれば）
   - `handoff.md`: セッションの間の引き継ぎ（下）
+  - `memo.md`: 持ち主のメモ。git に入れない（`.gitignore`）。main 側が機能の branch を取り込むときに、空のファイルとして作る（skill `merge-feature`）。中身は持ち主が書く
   - そのほか、その機能に関わる文書
 - `spec.md` は実装の前の仕様、`measurements.md` は計測した時点の結果として残す。この2つには、上の「経緯を書かない」を当てない。実装で仕様が変わったら、`spec.md` は直さず、`implementation.md` に書く
 

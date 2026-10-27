@@ -5,6 +5,9 @@ docs/outbox/
 # 作業の進行の記録。手元だけ
 docs/progress.md
 
+# 機能ごとの、持ち主のメモ。手元だけ
+docs/features/*/memo.md
+
 # 手元だけの Claude Code の設定
 .claude/settings.local.json
 
