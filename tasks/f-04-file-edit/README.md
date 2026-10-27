@@ -23,6 +23,7 @@ PYTHONPATH=../.. ../../.venv/bin/python -m local_coding_agent --model qwen3.5:9b
 - パッケージは `.venv` に入れていない（`pyproject.toml` の `package-mode = false`）ので、`PYTHONPATH` でリポジトリの根を渡す
 - 写し直すときは、前の写しを消してから写す。`cp -R` は、写し先のディレクトリがあると、その中に `project/` を写す
 - 走行の記録は、写しの中の `traces/` に書かれる
+- 既定の許可のモードは `allow-all` で、書く前に問わない。差分を見て問わせるときは、起動の引数に `--permission-mode ask` を足す
 
 ## 判定
 

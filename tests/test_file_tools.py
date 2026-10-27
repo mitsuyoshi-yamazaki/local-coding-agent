@@ -169,8 +169,13 @@ class EditFileTest(ToolTestCase):
             with self.subTest(path=path), self.assertRaisesRegex(ToolError, message):
                 edit_file.TOOL.run(arguments, self.cwd)
 
-    def test_changing_tools(self) -> None:
-        self.assertTrue(edit_file.TOOL.changes and write_file.TOOL.changes)
+    def test_kind_and_target(self) -> None:
+        for tool in (edit_file.TOOL, write_file.TOOL):
+            with self.subTest(tool=tool.name):
+                self.assertEqual(tool.kind, "edit")
+                self.assertIsNotNone(tool.target)
+                assert tool.target is not None
+                self.assertEqual(tool.target({"path": "a.txt"}), "a.txt")
 
 
 class EditInLoopTest(ToolTestCase):

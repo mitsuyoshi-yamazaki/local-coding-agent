@@ -18,7 +18,6 @@ DEFINITION = ToolDefinition(
     description=(
         "ファイルを丸ごと書く。ファイルが無ければ作り（親のディレクトリも作る）、"
         "あれば中身を content で置き換える。既存のファイルの一部を直すときは edit_file を使う。"
-        "実行の前に、利用者が差分を見て確かめる。"
     ),
     input_schema={
         "type": "object",

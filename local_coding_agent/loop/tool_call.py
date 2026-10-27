@@ -1,7 +1,8 @@
 """ループの1歩: モデルが呼んだ道具を、1つずつ順に実行し、表示し、走行の記録に書く。
 
-実行の前に、道具があるか・入力が定義に合うか・（変更を伴う道具なら）下見を見せて人が許すかを
-見る。どこで止まっても、誤りの結果（is_error）としてモデルに返し、ループは続ける。
+実行の前に、道具があるか・入力が定義に合うか・許可の判定（通す・問う・拒む）を見る。
+問うときは、下見を見せて人が許すかを確かめる。どこで止まっても、誤りの結果（is_error）として
+モデルに返し、ループは続ける。
 """
 
 import json
@@ -11,6 +12,12 @@ from dataclasses import dataclass
 from local_coding_agent.loop.session import Session
 from local_coding_agent.model.messages import ToolResultBlock, ToolUseBlock
 from local_coding_agent.permissions.confirm import REFUSED, confirm
+from local_coding_agent.permissions.policy import (
+    DENIED,
+    VERDICT_WORDS,
+    Decision,
+    decide,
+)
 from local_coding_agent.tools.input_check import input_problem
 from local_coding_agent.tools.tool import Tool, ToolError, find_tool
 
@@ -29,6 +36,8 @@ class ToolRun:
     seconds: float | None = None
     # 実行の前に人に見せた下見。見せなかったら None
     preview: str | None = None
+    # 許可の判定。判定の前に誤りになったら None
+    permission: Decision | None = None
 
 
 @dataclass(frozen=True)
@@ -73,7 +82,9 @@ def run_tool_call(
 
 
 def execute(session: Session, use: ToolUseBlock) -> ToolRun:
-    """道具を探し、入力を照らし、変更を伴う道具なら下見を見せて人に確かめてから実行する。"""
+    """道具を探し、入力を照らし、許可を判定する。問うなら、下見を見せて人に確かめてから
+    実行する。
+    """
     tool = find_tool(session.tools, use.name)
     if tool is None:
         names = ", ".join(known.name for known in session.tools)
@@ -81,22 +92,41 @@ def execute(session: Session, use: ToolUseBlock) -> ToolRun:
     problem = input_problem(tool.definition.input_schema, use.input)
     if problem is not None:
         return ToolRun(_error(use, f"入力が定義に合わない: {problem}"))
-    if not tool.changes:
-        return _run(session, tool, use, preview=None)
+    # 下見の前に判定する。拒む呼び出しのために、ファイルを読まないため
+    decision = decide(session.permissions, tool, use.input, session.cwd)
+    if decision.verdict == "deny":
+        _show_decision(session, decision)
+        return ToolRun(_error(use, f"{DENIED}: {decision.rule}"), permission=decision)
     try:
         preview = tool.preview(use.input, session.cwd) if tool.preview else None
     except ToolError as error:
         # 下見で誤りが分かれば（置き換え元が見つからない、など）、人に問わない
-        return ToolRun(_error(use, str(error)))
+        return ToolRun(_error(use, str(error)), permission=decision)
     if preview is not None:
         session.output.write(preview + "\n")
+    # 読む道具をモードで通すときだけは、何も出さない（F-05 までと同じ表示）
+    quiet = tool.kind == "read" and decision.verdict == "allow" and not decision.rule
+    if not quiet:
+        _show_decision(session, decision)
+    if decision.verdict == "allow":
+        return _run(session, tool, use, preview, decision)
     if not confirm(session.read_line):
-        return ToolRun(_error(use, REFUSED), confirmed=False, preview=preview)
-    return _run(session, tool, use, preview)
+        return ToolRun(_error(use, REFUSED), False, None, preview, decision)
+    return _run(session, tool, use, preview, decision, confirmed=True)
+
+
+def _show_decision(session: Session, decision: Decision) -> None:
+    words = VERDICT_WORDS[decision.verdict]
+    session.output.write(f"[許可] {words}: {decision.reason}\n")
 
 
 def _run(
-    session: Session, tool: Tool, use: ToolUseBlock, preview: str | None
+    session: Session,
+    tool: Tool,
+    use: ToolUseBlock,
+    preview: str | None,
+    permission: Decision,
+    confirmed: bool | None = None,
 ) -> ToolRun:
     """道具の関数を実行し、時間を測る。"""
     started = session.clock()
@@ -104,8 +134,8 @@ def _run(
         result = ToolResultBlock(use.id, tool.run(use.input, session.cwd))
     except ToolError as error:
         result = _error(use, str(error))
-    confirmed = True if tool.changes else None
-    return ToolRun(result, confirmed, session.clock() - started, preview)
+    seconds = session.clock() - started
+    return ToolRun(result, confirmed, seconds, preview, permission)
 
 
 def _stop(session: Session, use: ToolUseBlock, turn: int, step: int) -> ToolResultBlock:
@@ -146,6 +176,17 @@ def tool_record(
         "is_error": run.result.is_error,
         "seconds": run.seconds,
         "preview": run.preview,
+        "permission": _permission_record(run.permission),
+    }
+
+
+def _permission_record(decision: Decision | None) -> dict[str, object] | None:
+    if decision is None:
+        return None
+    return {
+        "decision": decision.verdict,
+        "reason": decision.reason,
+        "rule": decision.rule,
     }
 
 

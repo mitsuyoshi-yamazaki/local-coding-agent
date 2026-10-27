@@ -162,22 +162,31 @@ class InputCheckTest(unittest.TestCase):
 
 
 class DefaultToolsTest(unittest.TestCase):
-    def test_tools_and_which_change_files(self) -> None:
+    def test_tools_and_kinds(self) -> None:
         self.assertEqual(
-            [(tool.name, tool.changes) for tool in DEFAULT_TOOLS],
+            [(tool.name, tool.kind) for tool in DEFAULT_TOOLS],
             [
-                ("read_file", False),
-                ("list_directory", False),
-                ("write_file", True),
-                ("edit_file", True),
-                ("run_command", True),
+                ("read_file", "read"),
+                ("list_directory", "read"),
+                ("write_file", "edit"),
+                ("edit_file", "edit"),
+                ("run_command", "command"),
             ],
         )
 
     def test_changing_tools_have_preview(self) -> None:
         for tool in DEFAULT_TOOLS:
             with self.subTest(tool=tool.name):
-                self.assertEqual(tool.preview is not None, tool.changes)
+                self.assertEqual(tool.preview is not None, tool.kind != "read")
+
+    def test_every_tool_has_target(self) -> None:
+        self.assertTrue(all(tool.target is not None for tool in DEFAULT_TOOLS))
+
+    def test_targets(self) -> None:
+        self.assertEqual(read_file.target({"path": "a.txt"}), "a.txt")
+        self.assertEqual(list_directory.target({}), ".")
+        self.assertEqual(list_directory.target({"path": "src"}), "src")
+        self.assertEqual(run_command.target({"command": "ls -la"}), "ls -la")
 
     def test_find_tool(self) -> None:
         self.assertIs(find_tool(DEFAULT_TOOLS, "read_file"), read_file.TOOL)

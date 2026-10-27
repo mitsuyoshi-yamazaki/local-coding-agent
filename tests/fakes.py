@@ -8,12 +8,15 @@ from pathlib import Path
 from local_coding_agent.loop.session import Session
 from local_coding_agent.model.chat import ChatRequest, StreamEvent, ToolDefinition
 from local_coding_agent.model.messages import Message
-from local_coding_agent.tools.tool import Tool, ToolInput
+from local_coding_agent.permissions.policy import Permissions
+from local_coding_agent.tools.tool import Tool, ToolInput, ToolKind
 
 # 台本の1歩。応答の断片か終わりの知らせ、または投げる例外（Ctrl-C や通信の誤りを真似る）
 type Step = StreamEvent | BaseException
 
 START = datetime(2026, 10, 24, 15, 30, tzinfo=timezone(timedelta(hours=9)))
+# 偽物の Session の許可の既定。編集とコマンドの道具を全て問う
+ASK = Permissions(mode="ask")
 
 
 class ScriptedModel:
@@ -98,9 +101,10 @@ def ticking_now(
 def fake_tool(
     name: str,
     run: Callable[[ToolInput, Path], str],
-    changes: bool = False,
+    kind: ToolKind = "read",
     required: Sequence[str] = (),
     preview: Callable[[ToolInput, Path], str] | None = None,
+    target: Callable[[ToolInput], str] | None = None,
 ) -> Tool:
     """偽物の道具。入力の欄は全て文字列とする。"""
     schema = {
@@ -108,7 +112,8 @@ def fake_tool(
         "properties": {field: {"type": "string"} for field in required},
         "required": list(required),
     }
-    return Tool(ToolDefinition(name, f"{name} の説明", schema), changes, run, preview)
+    definition = ToolDefinition(name, f"{name} の説明", schema)
+    return Tool(definition, kind, run, preview, target=target)
 
 
 def fake_session(
@@ -119,8 +124,12 @@ def fake_session(
     output: io.StringIO | None = None,
     cwd: Path = Path("/fake/cwd"),
     show_thinking: bool = False,
+    permissions: Permissions = ASK,
 ) -> Session:
-    """偽物で組んだ Session。作業ディレクトリは、既定では使わない場所にする。"""
+    """偽物で組んだ Session。作業ディレクトリは、既定では使わない場所にする。
+
+    許可は、既定では ask のモードで規則は無し（編集とコマンドの道具を全て問う）とする。
+    """
     return Session(
         model=model,
         system="指示",
@@ -131,5 +140,6 @@ def fake_session(
         trace=trace if trace is not None else RecordingTrace(),
         clock=ticking_clock(),
         now=ticking_now(START),
+        permissions=permissions,
         show_thinking=show_thinking,
     )

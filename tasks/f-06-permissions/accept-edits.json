@@ -1,0 +1,6 @@
+{
+  "permissions": {
+    "mode": "accept-edits",
+    "allow": ["run_command(python3 -m unittest*)"]
+  }
+}
