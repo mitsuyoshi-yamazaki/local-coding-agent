@@ -2,7 +2,7 @@
 
 このリポジトリで作る機能の一覧である。Claude Code の機能と、他のコーディングエージェント（Aider・OpenCode・Codex・OpenHands など）が持つ機能から選んでいる。用語の意味は [コーディングエージェントの仕組み](how-coding-agents-work.md) にある。
 
-機能ごとの文書（実装前の仕様・実装した仕様・計測の結果）は、`features/f-NN-<機能名>/` にある。
+機能ごとの文書（実装前の仕様・実装した仕様・計測の結果・確かめる案内）は、`features/f-NN-<機能名>/` にある。
 
 | 機能 | 文書 |
 |---|---|
@@ -10,7 +10,7 @@
 | F-02 | [実装前の仕様](features/f-02-system-prompt/spec.md)・[実装した仕様と仕組み](features/f-02-system-prompt/implementation.md)・[計測の結果](features/f-02-system-prompt/measurements.md) |
 | F-03 | [実装前の仕様](features/f-03-tool-loop/spec.md)・[実装した仕様と仕組み](features/f-03-tool-loop/implementation.md)・[計測の結果](features/f-03-tool-loop/measurements.md) |
 | F-04 | [実装前の仕様](features/f-04-file-edit/spec.md)・[実装した仕様と仕組み](features/f-04-file-edit/implementation.md)・[計測の結果](features/f-04-file-edit/measurements.md) |
-| F-05 | [実装前の仕様](features/f-05-run-command/spec.md)・[実装した仕様と仕組み](features/f-05-run-command/implementation.md) |
+| F-05 | [実装前の仕様](features/f-05-run-command/spec.md)・[実装した仕様と仕組み](features/f-05-run-command/implementation.md)・[確かめる案内](features/f-05-run-command/guide.md) |
 
 ## 第1部 中核
 
