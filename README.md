@@ -14,6 +14,7 @@
 | [F-04 ファイルの書き込みと編集](docs/features/f-04-file-edit/implementation.md) | ファイルを丸ごと書く道具（`write_file`）と、文字列を置き換えて編集する道具（`edit_file`）を渡す。人に確かめるときは、実行の前に差分を見せる。置き換え元がそのままで見つからなければ、行末の空白と字下げのずれを除いて探す |
 | [F-05 コマンドの実行と、結果を読んで直すループ](docs/features/f-05-run-command/implementation.md) | シェルのコマンドを走らせる道具（`run_command`）を渡す。モデルは、直した後にテストを走らせ、終了コードと出力を読んで、失敗していれば直す。人に確かめるときは、実行の前にコマンドを見せる。時間切れ（既定 120 秒）と Ctrl-C で、コマンドが起こしたプロセスまで止める |
 | [F-06 許可](docs/features/f-06-permissions/implementation.md) | 道具の呼び出しを、ハーネスが「通す・問う・拒む」に決める。決め方は、作業ディレクトリの設定ファイルに書いた規則（`allow`・`ask`・`deny`）と、モード（`ask`・`accept-edits`・`allow-all`）である。既定は `allow-all`（全部通す）。`run_command` の規則は、`&&`・`;`・`|` などで分けたコマンドの部分ごとに照らす |
+| [F-07 slash commands](docs/features/f-07-slash-commands/implementation.md) | `/` で始まる行を、ハーネスがコマンドとして処理する。組み込みの `/help`・`/clear`・`/context`・`/mode`・`/exit` はモデルを呼ばない。作業ディレクトリの `.local-coding-agent/commands/<名前>.md` に書いた手順を `/<名前>` で呼ぶと、引数を入れた中身を依頼としてモデルに送る |
 
 ## 要るもの
 
@@ -78,6 +79,7 @@ ollama pull gpt-oss:20b
 走行の記録: traces/20261024-153012.jsonl
 指示: 既定
 許可: allow-all・規則 0（設定ファイル無し）
+コマンド: /help で一覧
 > 私は山田です
 はい、山田さん。
 [入力 12 トークン・出力 5 トークン・最初の文字まで 0.81 秒・全体 1.20 秒]
@@ -114,14 +116,37 @@ ollama pull gpt-oss:20b
   - どの規則にも合わなければ、モードで決まる。`ask` は、作業ディレクトリの中を読むのは通し、ほかは問う。`accept-edits` は、加えて作業ディレクトリの中の編集も通す。`allow-all` は全て通す（規則の `deny` と `ask` は効く）
   - 規則は、コマンドとパスの文字列に合わせるだけである。`rm` を拒んでも、`find -delete` や `python3 -c` では消せる
 - **実行の前の問い**: 問うときは、`write_file` と `edit_file` は書く前と後の中身の差分を、`run_command` は `$ <コマンド>` を表示し、`[許可] 問う: <理由>` の1行の後に `実行してよいか [y/N]: ` と問う（`y` か `yes` で実行する）。拒むと実行せず、拒んだことをモデルに返す。規則で拒んだときは、問わずに `→ 誤り: 規則で拒んだ: <規則>` を出し、同じ文をモデルに返す。変更を伴う道具を問わずに通すときも、差分かコマンドと `[許可] 通す: <理由>` を出す。置き換え元が見つからないなど、実行できないと分かったときは、問わずに誤りをモデルに返す
+- **slash commands**: 行の頭が `/<名前>`（英小文字・数字・`-`・`_`）の行は、ハーネスがコマンドとして処理する。名前の後ろの文が引数である。`/tmp/a.txt を読んで` のように語に `/` を含む行は、依頼として送る。知らない名前は `誤り: 知らないコマンド: …` を出し、送らない（依頼として送るなら、行の頭に空白を置く）
+  - 組み込みのコマンドは、モデルを呼ばず、会話にも入らない
+
+    | コマンド | すること |
+    |---|---|
+    | `/help` | コマンドの一覧を出す |
+    | `/clear` | 会話の履歴を消し、次の依頼から新しい会話にする |
+    | `/context` | 今の履歴の発言の数（依頼・モデル・道具の結果）と、最後の要求の入力トークン数を出す |
+    | `/mode [<モード>]` | 許可のモードを見る。モードを渡せば、その会話の間だけ変える（設定ファイルには書かない） |
+    | `/exit` | 終える |
+
+  - 自作のコマンドは、作業ディレクトリの `.local-coding-agent/commands/<名前>.md` に書く。呼ぶたびに読む。本文の `$ARGUMENTS` は引数に置き換わり、`$ARGUMENTS` が無くて引数があれば、末尾に `ARGUMENTS: <引数>` が足される。頭の `---` で囲んだ前付けの `description:` が `/help` に出る（無ければ本文の最初の行）。組み込みと同じ名前のものは呼べない。例:
+
+    ```markdown
+    ---
+    description: テストを走らせ、失敗していれば直す
+    ---
+
+    テストを走らせよ。失敗していれば直せ。対象: $ARGUMENTS
+    ```
+
+  - 自作のコマンドで送る発言には、送った時刻と並べて、打った行（`コマンド: /fix test_a.py`）が `<metadata>` に入る。その後は、打った依頼と同じく回が進む
 - **Ctrl-C**: 応答の途中・道具の実行の途中・問いの途中で押すと、その回を止める。コマンドの途中なら、コマンドと、コマンドが起こしたプロセスを止める。1回目の応答の途中なら、その回は次の回に送る会話に入らない。それより後なら、済んだ歩み（応答と道具の結果）までが会話に残り、止めたことの知らせが付く。モデルの誤りで止まった回も同じである
-- **Ctrl-D**: 終える
-- **走行の記録**: 起動ごとに1つ、`traces/<起動の時刻>.jsonl` に書かれる。1行に1件で、送った JSON の全体と、受けた応答（推論の文を含む）・道具の呼び出しと結果・トークン数・時間が入る。1件目は、読んだ許可の設定である。中身の欄は [F-01 の文書](docs/features/f-01-chat-and-trace/implementation.md#走行の記録)・[F-03 の文書](docs/features/f-03-tool-loop/implementation.md#走行の記録)・[F-04 の文書](docs/features/f-04-file-edit/implementation.md#走行の記録)・[F-06 の文書](docs/features/f-06-permissions/implementation.md#走行の記録) にある。送った JSON には、system prompt・道具の定義・送った時刻を入れた発言が、モデルに渡した形のまま入る
+- **Ctrl-D**: 終える（`/exit` と同じ）
+- **走行の記録**: 起動ごとに1つ、`traces/<起動の時刻>.jsonl` に書かれる。1行に1件で、送った JSON の全体と、受けた応答（推論の文を含む）・道具の呼び出しと結果・トークン数・時間が入る。1件目は、読んだ許可の設定である。コマンドの行ごとにも1件が入る。中身の欄は [F-01 の文書](docs/features/f-01-chat-and-trace/implementation.md#走行の記録)・[F-03 の文書](docs/features/f-03-tool-loop/implementation.md#走行の記録)・[F-04 の文書](docs/features/f-04-file-edit/implementation.md#走行の記録)・[F-06 の文書](docs/features/f-06-permissions/implementation.md#走行の記録)・[F-07 の文書](docs/features/f-07-slash-commands/implementation.md#走行の記録) にある。送った JSON には、system prompt・道具の定義・送った時刻を入れた発言が、モデルに渡した形のまま入る
 - **指示の差し替え**: 指示の長さで答えがどう変わるかを試すための指示のファイルが、`tasks/f-02-system-prompt/` にある（`short.md`・`long.md`）。指示を送らないときは `--system-prompt-file /dev/null` を渡す。中身は [F-02 の文書](docs/features/f-02-system-prompt/implementation.md#試すための指示のファイル) にある
 - **道具を試す材料**: ファイルを辿らないと答えられない問いと、長いファイルを分けて読む問いのための小さなプロジェクトが、`tasks/f-03-tool-loop/project/` にある。問いと答えは [F-03 の文書](docs/features/f-03-tool-loop/implementation.md#試すための材料) にある
 - **編集を試す材料**: 通らないテストを持つ小さなプロジェクトが、`tasks/f-04-file-edit/project/` にある。写しを作業ディレクトリにして起動し、通ったかをテストの終了コードで判定する。写し方と判定のコマンドは `tasks/f-04-file-edit/README.md` に、依頼の例は [F-04 の文書](docs/features/f-04-file-edit/implementation.md#試すための材料) にある
 - **コマンドを試す材料**: テストが失敗する小さなプロジェクトと、テストが終わらない小さなプロジェクトが、`tasks/f-05-run-command/` にある。写し方と判定のコマンドは `tasks/f-05-run-command/README.md` に、依頼の例は [F-05 の文書](docs/features/f-05-run-command/implementation.md#試すための材料) にある
 - **許可を試す材料**: 消すのを拒む設定と、秘密のファイルを読むのを拒む設定を置いた小さなプロジェクトと、編集とテストを問わない設定ファイルが、`tasks/f-06-permissions/` にある。写し方と課題は `tasks/f-06-permissions/README.md` にある
+- **コマンドを試す材料**: 通らないテストと、自作のコマンドのファイル3つを持つ小さなプロジェクトが、`tasks/f-07-slash-commands/project/` にある。写し方と課題と判定のコマンドは `tasks/f-07-slash-commands/README.md` にある
 
 ## 開発
 

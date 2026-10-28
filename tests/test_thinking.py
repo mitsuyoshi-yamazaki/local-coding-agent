@@ -41,7 +41,7 @@ class Run:
             output=self.output,
             show_thinking=show_thinking,
         )
-        self.history = run_turn(session, (), "依頼", 1)
+        self.history = run_turn(session, (), "依頼", 1).history
 
     def response(self, step: int) -> dict[str, object]:
         return dict(self.trace.of_type("response")[step - 1])

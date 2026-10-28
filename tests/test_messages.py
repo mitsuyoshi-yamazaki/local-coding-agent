@@ -21,6 +21,20 @@ class MetadataTextTest(unittest.TestCase):
             metadata_text(user_text("a", sent_at)),
         )
 
+    def test_command_comes_after_sent_at(self) -> None:
+        sent_at = datetime(2026, 10, 24, 15, 30, tzinfo=JST)
+        self.assertEqual(
+            metadata_text(user_text("直せ: a.py", sent_at, command="/fix a.py")),
+            "<metadata>\n送った時刻: 2026-10-24 15:30 (+09:00)\n"
+            "コマンド: /fix a.py\n</metadata>\n",
+        )
+
+    def test_command_without_sent_at(self) -> None:
+        self.assertEqual(
+            metadata_text(user_text("a", command="/a")),
+            "<metadata>\nコマンド: /a\n</metadata>\n",
+        )
+
     def test_message_without_metadata_is_empty(self) -> None:
         self.assertEqual(metadata_text(user_text("a")), "")
         self.assertEqual(metadata_text(assistant_text("a")), "")

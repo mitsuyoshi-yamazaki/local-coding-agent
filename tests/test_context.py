@@ -14,6 +14,7 @@ from local_coding_agent.context.system_prompt import (
     read_instructions,
 )
 from local_coding_agent.loop.turn import CANCELLED_NOTE
+from local_coding_agent.model.messages import COMMAND_LABEL
 from local_coding_agent.model.ollama_messages import ERROR_PREFIX
 from local_coding_agent.permissions.policy import DENIED
 from local_coding_agent.tools.default import DEFAULT_TOOLS
@@ -97,6 +98,8 @@ class SystemPromptTest(unittest.TestCase):
         self.assertIn(f"「{CANCELLED_NOTE}」", DEFAULT_INSTRUCTIONS)
         # 規則で拒んだ結果の始まり（permissions/policy.py）
         self.assertIn(f"「{DENIED}: 」で始まる誤り", DEFAULT_INSTRUCTIONS)
+        # 自作のコマンドで送った発言の、メタデータの行（model/messages.py）
+        self.assertIn(f"「{COMMAND_LABEL}」の行", DEFAULT_INSTRUCTIONS)
 
     def test_default_instructions_tell_not_to_work_around_denials(self) -> None:
         self.assertIn(

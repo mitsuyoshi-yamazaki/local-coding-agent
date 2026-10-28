@@ -67,7 +67,8 @@ class Run:
         session = fake_session(
             self.model, tools, self.read_line, self.trace, self.output
         )
-        self.history = run_turn(session, history, "依頼", 1)
+        self.result = run_turn(session, history, "依頼", 1)
+        self.history = self.result.history
 
     def results(self, call_number: int) -> tuple[object, ...]:
         """call_number 回目に呼んだときに送った、最後の発言の塊。"""
@@ -121,6 +122,33 @@ class LoopTest(unittest.TestCase):
         run = Run([[call("echo"), STOP], [call("echo"), STOP], [STOP]])
         self.assertEqual(len(run.model.sent), 3)
         self.assertEqual(len(run.history), 6)
+
+
+def counted(tokens: int) -> Done:
+    return Done(done_reason="stop", stats={"prompt_eval_count": tokens})
+
+
+class InputTokensTest(unittest.TestCase):
+    def test_last_finished_response_of_turn(self) -> None:
+        run = Run([[call("echo"), counted(100)], [TextDelta("答え"), counted(130)]])
+        self.assertEqual(run.result.input_tokens, 130)
+
+    def test_stopped_turn_keeps_last_finished_response(self) -> None:
+        run = Run([[call("echo"), counted(100)], [ModelError("繋がらない")]])
+        self.assertEqual(run.result.input_tokens, 100)
+
+    def test_none_when_no_response_finished(self) -> None:
+        self.assertIsNone(
+            Run([[TextDelta("途中"), KeyboardInterrupt()]]).result.input_tokens
+        )
+
+    def test_later_response_without_count_keeps_earlier_count(self) -> None:
+        run = Run([[call("echo"), counted(100)], [TextDelta("答え"), Done("stop")]])
+        self.assertEqual(run.result.input_tokens, 100)
+
+    def test_none_when_model_did_not_count(self) -> None:
+        run = Run([[TextDelta("答え"), Done(done_reason="stop")]])
+        self.assertIsNone(run.result.input_tokens)
 
 
 class ToolErrorTest(unittest.TestCase):
