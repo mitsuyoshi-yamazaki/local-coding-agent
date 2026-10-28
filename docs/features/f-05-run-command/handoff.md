@@ -192,3 +192,33 @@ main 側のセッションが、人から来た問いと答え・直したこと
 - `docs/features.md` の F-05 の行に、guide.md へのリンクを足した
 - skill `merge-feature` の 5. を「確かめる案内を書き、人に示す」にし、guide.md を書くこと・中身が変われば追従させることを書いた
 - **この後の main 側**: 確認の間に直したことで、guide.md の3つ（確かめ方・読む順・変わり）のどれかが変われば、guide.md も直し、直しと同じ commit に入れる
+
+### 持ち主が2つの課題を試した（2026-10-28）
+
+- 持ち主の報告: 「.tmp/ ディレクトリに作成した作業ディレクトリで実行した」。写しは `.tmp/f-05-duration`・`.tmp/f-05-words`、モデルは `qwen3.5:9b`（走行の記録の `body.model`）、既定の指示。どちらも1回の依頼（`テストを走らせて、通らないものを直せ`）で通った。問いには全て許した（`confirmed` が全て真）
+- 判定: main 側が `judge.py` を2つの写しに掛け、どちらも終了コード 0。写しで変わったのは `duration.py`・`words.py` だけで、テストのファイルは元のまま（`git diff --no-index` で試す材料の元と比べた）
+- 要約の道具 `.tmp/f05_steps.py`（git に入れない。`steps`・`totals`・`texts` の3つ）で読んだ
+
+#### duration（走行の記録 `20261028-000421`）
+
+- 歩み: `list_directory` → `read_file test_duration.py` → `read_file duration.py` → `run_command python3 -m pytest test_duration.py -v`（終了コード 1・44 行。`2 failed, 1 passed`）→ `edit_file`（`parse_duration` に `number = ""`）→ `edit_file`（`format_duration` の `rest = rest % 60` を `rest -= count * size`）→ 同じ pytest（終了コード 0）→ 答え。8歩
+- README を読まず、README に書いた `python3 -m unittest` ではなく pytest を選んだ。持ち主の端末の `PATH` の `python3`（Python 3.9.1）に pytest 8.4.1 が入っていた
+- **pytest がリポジトリの根に書いた**: 写しはリポジトリの中にあるので、pytest はリポジトリの根の `pyproject.toml` を設定のファイルにし、根を `rootdir` にした（出力の `rootdir:`・`configfile: pyproject.toml`）。根に `.pytest_cache/` を作った（00:05。中の `.gitignore` で git には入らない）。作るエージェントのコマンドが、作業ディレクトリの外に書いた例である（素の状態で全て許すので、止めるものは無い。F-06 の規則の材料）
+- pytest の出力は、`subTest` の失敗を1つずつではなく、テストの関数ごとに最初の1つだけを出した（`190 != 90`・`'30s' != '1m30s'`）。それでも2か所とも直した
+- 答えの説明: `parse_duration` は正しい。`format_duration` の説明は混乱している（「`90 // 60 = 1` は正しかったが…残りが 0 になる計算は正しかった。ただし `% 60` の問題があった」）。実際の誤りは、`h` の段で `rest` が `90 % 60 = 30` になり、分が消えること
+- 数値: モデルを8回呼んだ。入力のトークンの和 29,207（最大 5,910）・出力の和 2,244。モデルの時間の和 343.0 秒（うち `edit_file` を出した5歩目が 163.7 秒。出力 1,022 トークンに 157.7 秒）。道具の時間の和 13.5 秒（pytest の2回が 6.5 秒・6.9 秒。pytest が出した時間は 0.08 秒・0.05 秒）。問いに答えるまでの待ちの和 313 秒。始めから答えまで 670 秒
+- 出力の切り詰めは起きなかった（最大 2,033 字）
+
+#### words（走行の記録 `20261028-003835`）
+
+- 歩み: `list_directory` → `read_file README.md` → `run_command python3 -m unittest`（時間切れ 120 秒。出力は `..`）→ `read_file test_words.py` → `read_file words.py` → 本文で原因を述べてから `run_command python3 -c "print('hello')"`（意味の無い確かめ）→ `run_command timeout 2 python3 -c "…split_words(' hello')…"`（終了コード 127。`/bin/sh: timeout: command not found`）→ 同じものを `timeout` 無しで（時間切れ 120 秒・出力なし）→ `edit_file` → `python3 -m unittest`（終了コード 0）→ 答え。11歩
+- README を読んでテストの走らせ方を確かめた（duration とは違う）
+- **道具の `timeout` の入力を使わなかった**: 時間を限るのに、シェルの `timeout` のコマンドを使おうとした（macOS には無い）。無いと分かった後は、時間を限らずに走らせ、2回目の 120 秒の時間切れになった。`-v` も使わず、どのテストで止まったかは見ていない。道具の定義には `timeout` の欄と「過ぎたら止める」が書いてある
+- 直し: `if end > start:` の中で `start = end`、`else` で `start = end + 1`。仕様の答え（`start = end + 1` の1行）と違うが、正しい（判定が通る。語の後は `start` がスペースの位置に来て、次の周りで `else` に入る）
+- 答えの説明: 「先頭や連続したスペースで `start == end` の場合」に無限ループ、とした。実際は、スペースを含む全ての文で止まる（語の後の `start = end` でスペースの位置に留まる）。答えの始めに中国語が混じった（「テスト通过了！」）
+- 数値: モデルを11回呼んだ。入力のトークンの和 35,710（最大 5,142）・出力の和 2,463。モデルの時間の和 440.9 秒。道具の時間の和 244.5 秒（時間切れの2回で 240 秒）。問いに答えるまでの待ちの和 1,145 秒。始めから答えまで 1,831 秒
+- **待ちが 5 分を超えた後の歩みは遅い**: 9〜11歩目は、前の応答から次の要求まで 371・335・404 秒空き、`load_duration` が 5.9〜6.5 秒、入力の処理が 47.5〜58.2 秒だった（ほかの歩みは 0.4〜2.1 秒）。Ollama が、5 分使わなかったモデルを下ろし、入力を始めから処理し直したと推定する（Ollama の `keep_alive` の既定は 5 分。この走行で確かめたのは、時間と `load_duration` の値だけ）。duration は最長の空きが 170 秒で、遅くならなかった
+
+#### まだ試していないこと
+
+- 問いで拒んだとき・コマンドの途中で Ctrl-C を押したときに、モデルがどうするか（仕様の「試し方」）。この2回の走行では、拒みも Ctrl-C も無かった
