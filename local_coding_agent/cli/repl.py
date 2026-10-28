@@ -3,8 +3,9 @@
 モデルの API は会話の状態を持たないので、履歴はここで持つ（Conversation）。回ごとに履歴を
 ループへ渡し、その回を足した新しい履歴を受け取る。
 
-/ で始まる行（commands/parse.py）は、組み込みのコマンド → 自作のコマンドの順に探す。組み込みは
-モデルを呼ばない。自作は、ファイルの中身に引数を入れた文を、依頼としてループに渡す。
+/ で始まる行（commands/parse.py）は、組み込みのコマンド → 自作のコマンド → スキルの順に探す。
+組み込みはモデルを呼ばない。自作は、ファイルの中身に引数を入れた文を、依頼としてループに渡す。
+スキルは、モデルが load_skill で読み込むときと同じ中身（skills/content.py）を、依頼として渡す。
 """
 
 from dataclasses import replace
@@ -22,11 +23,13 @@ from local_coding_agent.commands.custom import (
 from local_coding_agent.commands.parse import CommandLine, parse_command
 from local_coding_agent.loop.session import Session
 from local_coding_agent.loop.turn import run_turn
+from local_coding_agent.skills.catalog import Skill, SkillError, find_skill
+from local_coding_agent.skills.content import skill_text
 
 PROMPT = "> "
 
 # 走行の記録の、コマンドの件の kind
-type CommandKind = Literal["builtin", "custom", "unknown"]
+type CommandKind = Literal["builtin", "custom", "skill", "unknown"]
 
 
 def run(session: Session) -> None:
@@ -61,14 +64,17 @@ def handle_line(conversation: Conversation, line: str) -> Conversation:
         output = f"誤り: /{command.name} を読めない: {error}"
         _show(conversation, command, "custom", output)
         return conversation
-    if custom is None:
-        output = (
-            f"誤り: 知らないコマンド: /{command.name}"
-            "（/help で一覧。依頼として送るなら、行の頭に空白を置く）"
-        )
-        _show(conversation, command, "unknown", output)
-        return conversation
-    return _send_custom(conversation, command, custom)
+    if custom is not None:
+        return _send_custom(conversation, command, custom)
+    skill = find_skill(conversation.session.skills, command.name)
+    if skill is not None:
+        return _send_skill(conversation, command, skill)
+    output = (
+        f"誤り: 知らないコマンド: /{command.name}"
+        "（/help で一覧。依頼として送るなら、行の頭に空白を置く）"
+    )
+    _show(conversation, command, "unknown", output)
+    return conversation
 
 
 def _send_custom(
@@ -95,15 +101,49 @@ def _send_custom(
         source=custom.path,
         text=text,
     )
-    return _send(conversation, text, command.line)
+    return _send(conversation, text, command=command.line)
+
+
+def _send_skill(
+    conversation: Conversation, command: CommandLine, skill: Skill
+) -> Conversation:
+    """スキルの中身（本文に引数を入れ、付いているファイルを添えたもの）を、依頼として送る。"""
+    try:
+        text = skill_text(conversation.session.cwd, skill, command.arguments)
+    except SkillError as error:
+        output = f"誤り: /{command.name} のスキルを使えない: {error}"
+        _show(conversation, command, "skill", output, source=skill.path)
+        return conversation
+    lines = len(text.splitlines())
+    output = f"[スキル] /{command.name} → {skill.path}（{lines} 行を依頼として送る）"
+    turn = conversation.next_turn
+    _show(
+        conversation,
+        command,
+        "skill",
+        output,
+        turn=turn,
+        source=skill.path,
+        text=text,
+    )
+    return _send(conversation, text, skill=command.line)
 
 
 def _send(
-    conversation: Conversation, text: str, command: str | None = None
+    conversation: Conversation,
+    text: str,
+    *,
+    command: str | None = None,
+    skill: str | None = None,
 ) -> Conversation:
-    """依頼として回を1つ始める。入力のトークン数は、その回で数えられなければ前の値を保つ。"""
+    """依頼として回を1つ始める。入力のトークン数は、その回で数えられなければ前の値を保つ。
+
+    command は自作のコマンドで、skill はスキルを /<名前> で呼んで送るときの、打った行。
+    どちらか片方だけを渡す（打った依頼なら、どちらも渡さない）。
+    """
     turn = conversation.next_turn
-    result = run_turn(conversation.session, conversation.history, text, turn, command)
+    session, history = conversation.session, conversation.history
+    result = run_turn(session, history, text, turn, command=command, skill=skill)
     tokens = result.input_tokens
     return replace(
         conversation,

@@ -14,10 +14,11 @@ from local_coding_agent.context.system_prompt import (
     read_instructions,
 )
 from local_coding_agent.loop.turn import CANCELLED_NOTE
-from local_coding_agent.model.messages import COMMAND_LABEL
+from local_coding_agent.model.messages import COMMAND_LABEL, SKILL_LABEL
 from local_coding_agent.model.ollama_messages import ERROR_PREFIX
 from local_coding_agent.permissions.policy import DENIED
 from local_coding_agent.tools.default import DEFAULT_TOOLS
+from local_coding_agent.tools.load_skill import TOOL_NAME
 
 
 class EnvironmentSectionTest(unittest.TestCase):
@@ -80,6 +81,15 @@ class SystemPromptTest(unittest.TestCase):
     def test_empty_instructions_leave_environment_only(self) -> None:
         self.assertEqual(build_system_prompt("\n", "# 環境"), "# 環境")
 
+    def test_skills_section_comes_after_environment(self) -> None:
+        self.assertEqual(
+            build_system_prompt("指示。", "# 環境", "# スキル\n\n- a: 説明"),
+            "指示。\n\n# 環境\n\n# スキル\n\n- a: 説明",
+        )
+        self.assertEqual(
+            build_system_prompt("指示。", "# 環境", ""), "指示。\n\n# 環境"
+        )
+
     def test_default_instructions_without_file(self) -> None:
         self.assertEqual(read_instructions(None), DEFAULT_INSTRUCTIONS)
 
@@ -100,6 +110,11 @@ class SystemPromptTest(unittest.TestCase):
         self.assertIn(f"「{DENIED}: 」で始まる誤り", DEFAULT_INSTRUCTIONS)
         # 自作のコマンドで送った発言の、メタデータの行（model/messages.py）
         self.assertIn(f"「{COMMAND_LABEL}」の行", DEFAULT_INSTRUCTIONS)
+        # スキルを /<名前> で呼んで送った発言の、メタデータの行（model/messages.py）
+        self.assertIn(f"「{SKILL_LABEL}」の行", DEFAULT_INSTRUCTIONS)
+        # スキルの一覧の節（skills/catalog.py）と、読み込む道具
+        self.assertIn("「# スキル」の節", DEFAULT_INSTRUCTIONS)
+        self.assertIn(TOOL_NAME, DEFAULT_INSTRUCTIONS)
 
     def test_default_instructions_tell_not_to_work_around_denials(self) -> None:
         self.assertIn(

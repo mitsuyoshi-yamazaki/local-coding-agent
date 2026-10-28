@@ -4,7 +4,7 @@
 ハーネスが照らし、合わなければ、どこが合わないかを誤りの結果としてモデルに返す。
 
 照らすのは、このリポジトリの道具が使う範囲だけである: 必須の欄（required）・欄の型（type）・
-数の下限（minimum）と上限（maximum）。定義に無い欄は見ない。
+数の下限（minimum）と上限（maximum）・決まった値のどれか（enum）。定義に無い欄は見ない。
 """
 
 import json
@@ -49,6 +49,10 @@ def _property_problem(name: str, rule: dict[str, object], item: object) -> str |
     expected = rule.get("type")
     if isinstance(expected, str) and not _has_type(item, expected):
         return f"{name} は {expected} でなければならない（受けた値: {_shown(item)}）"
+    choices = rule.get("enum")
+    if isinstance(choices, list) and item not in choices:
+        listed = ", ".join(str(choice) for choice in choices)
+        return f"{name} は次のどれか: {listed}（受けた値: {_shown(item)}）"
     minimum = rule.get("minimum")
     if _is_number(item) and _is_number(minimum) and item < minimum:
         return f"{name} は {minimum} 以上でなければならない（受けた値: {_shown(item)}）"

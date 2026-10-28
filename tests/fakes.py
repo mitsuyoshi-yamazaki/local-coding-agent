@@ -9,6 +9,7 @@ from local_coding_agent.loop.session import Session
 from local_coding_agent.model.chat import ChatRequest, StreamEvent, ToolDefinition
 from local_coding_agent.model.messages import Message
 from local_coding_agent.permissions.policy import Permissions
+from local_coding_agent.skills.catalog import SkillCatalog
 from local_coding_agent.tools.tool import Tool, ToolInput, ToolKind
 
 # 台本の1歩。応答の断片か終わりの知らせ、または投げる例外（Ctrl-C や通信の誤りを真似る）
@@ -125,10 +126,12 @@ def fake_session(
     cwd: Path = Path("/fake/cwd"),
     show_thinking: bool = False,
     permissions: Permissions = ASK,
+    skills: SkillCatalog | None = None,
 ) -> Session:
     """偽物で組んだ Session。作業ディレクトリは、既定では使わない場所にする。
 
     許可は、既定では ask のモードで規則は無し（編集とコマンドの道具を全て問う）とする。
+    スキルは、既定では無しとする。
     """
     return Session(
         model=model,
@@ -142,4 +145,5 @@ def fake_session(
         now=ticking_now(START),
         permissions=permissions,
         show_thinking=show_thinking,
+        skills=skills if skills is not None else SkillCatalog(),
     )

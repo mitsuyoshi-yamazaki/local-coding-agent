@@ -1,13 +1,14 @@
 """ループと REPL が使うもの。起動のときに1度作り、会話の間は変えない。"""
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import TextIO
 
 from local_coding_agent.model.chat import ChatModel
 from local_coding_agent.permissions.policy import Permissions
+from local_coding_agent.skills.catalog import SkillCatalog
 from local_coding_agent.tools.tool import Tool
 from local_coding_agent.trace.writer import TraceSink
 
@@ -35,3 +36,6 @@ class Session:
     permissions: Permissions
     # 推論の文を表示するか（--show-thinking）。表示しなくても、走行の記録には残す
     show_thinking: bool = False
+    # 起動のときに探したスキル。REPL が /<名前> と /help で使う（モデルには、system prompt の
+    # 「# スキル」の節と、道具 load_skill で渡す）
+    skills: SkillCatalog = field(default_factory=SkillCatalog)

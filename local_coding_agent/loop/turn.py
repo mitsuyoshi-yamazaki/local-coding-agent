@@ -43,13 +43,16 @@ def run_turn(
     text: str,
     turn: int,
     command: str | None = None,
+    skill: str | None = None,
 ) -> TurnResult:
     """1回の依頼を処理し、新しい履歴を返す。command は、自作のコマンドで送るときの、打った行。
+    skill は、スキルを /<名前> で呼んで送るときの、打った行。
 
     回数の上限は無く、止めるのは人の Ctrl-C である。止めた回と誤りの回は、済んだ歩み
     （応答と、その呼び出しの結果）までを履歴に残す。済んだ歩みが無ければ、元の履歴を返す。
     """
-    messages = (*history, user_text(text, sent_at=session.now(), command=command))
+    request = user_text(text, sent_at=session.now(), command=command, skill=skill)
+    messages = (*history, request)
     step = 0
     tokens: int | None = None
     try:

@@ -4,8 +4,8 @@
 である。
 
 利用者の発言は、メタデータとして送った時刻（sent_at）と、自作のコマンドで送ったならその行
-（command）を持つ。Messages API の発言には無い欄で、モデルは文しか読めないので、送る直前に
-本文の前へ文として入れる（metadata_text）。
+（command）と、スキルを /<名前> で呼んで送ったならその行（skill）を持つ。Messages API の発言には
+無い欄で、モデルは文しか読めないので、送る直前に本文の前へ文として入れる（metadata_text）。
 """
 
 from collections.abc import Mapping, Sequence
@@ -17,6 +17,8 @@ type Role = Literal["user", "assistant"]
 
 # メタデータの文で、自作のコマンドの行の前に置く見出し。既定の指示が、この見出しを説明する
 COMMAND_LABEL = "コマンド: "
+# メタデータの文で、/<名前> で呼んだスキルの行の前に置く見出し。既定の指示が、この見出しを説明する
+SKILL_LABEL = "スキル: "
 
 
 @dataclass(frozen=True)
@@ -70,14 +72,23 @@ class Message:
     sent_at: datetime | None = None
     # 自作のコマンドで送った発言なら、利用者が打った行（例: /fix test_a.py）。ほかは None
     command: str | None = None
+    # スキルを /<名前> で呼んで送った発言なら、利用者が打った行（例: /review a.py）。ほかは None
+    skill: str | None = None
 
 
 def user_text(
-    text: str, sent_at: datetime | None = None, command: str | None = None
+    text: str,
+    sent_at: datetime | None = None,
+    command: str | None = None,
+    skill: str | None = None,
 ) -> Message:
     """本文だけの、利用者の発言を作る。"""
     return Message(
-        role="user", content=(TextBlock(text),), sent_at=sent_at, command=command
+        role="user",
+        content=(TextBlock(text),),
+        sent_at=sent_at,
+        command=command,
+        skill=skill,
     )
 
 
@@ -117,6 +128,7 @@ def metadata_text(message: Message) -> str:
     lines = (
         *((f"送った時刻: {_minutes(sent_at)}",) if sent_at is not None else ()),
         *((COMMAND_LABEL + message.command,) if message.command is not None else ()),
+        *((SKILL_LABEL + message.skill,) if message.skill is not None else ()),
     )
     if not lines:
         return ""

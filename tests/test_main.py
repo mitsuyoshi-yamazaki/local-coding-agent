@@ -8,6 +8,7 @@ from unittest import mock
 
 from local_coding_agent.__main__ import main, parse_args
 from local_coding_agent.permissions.settings import SETTINGS_PATH
+from local_coding_agent.skills.catalog import GUIDE, SKILLS_PATH
 from local_coding_agent.tools.default import DEFAULT_TOOLS
 
 
@@ -74,7 +75,9 @@ class MainTest(MainTestCase):
         run.assert_not_called()
 
 
-class PermissionsAtStartTest(MainTestCase):
+class StartTestCase(MainTestCase):
+    """作業ディレクトリを一時ディレクトリにし、REPL を走らせずに起動する。"""
+
     def setUp(self) -> None:
         super().setUp()
         directory = tempfile.TemporaryDirectory()
@@ -100,6 +103,8 @@ class PermissionsAtStartTest(MainTestCase):
             code = main(["--model", "m", *argv])
         return code, run, output.getvalue(), errors.getvalue()
 
+
+class PermissionsAtStartTest(StartTestCase):
     def test_settings_file_reaches_session(self) -> None:
         self.write_settings(
             '{"permissions": {"mode": "ask", "deny": ["run_command(rm *)"]}}'
@@ -146,6 +151,70 @@ class PermissionsAtStartTest(MainTestCase):
         self.assertEqual(output, "")
         run.assert_not_called()
         self.assertEqual(list(self.traces.iterdir()), [])
+
+
+class SkillsAtStartTest(StartTestCase):
+    def write_skill(self, name: str, text: str) -> None:
+        path = self.cwd / SKILLS_PATH / name / "SKILL.md"
+        path.parent.mkdir(parents=True)
+        path.write_text(text, encoding="utf-8")
+
+    def test_skills_add_tool_and_section(self) -> None:
+        self.write_skill("review", "---\ndescription: 読む\n---\n本文")
+        _, run, output, _ = self.start()
+        session = run.call_args.args[0]
+        self.assertEqual(
+            [tool.name for tool in session.tools],
+            [*(tool.name for tool in DEFAULT_TOOLS), "load_skill"],
+        )
+        self.assertTrue(
+            session.system.endswith("\n\n# スキル\n\n" + GUIDE + "\n\n- review: 読む")
+        )
+        self.assertEqual([skill.name for skill in session.skills.skills], ["review"])
+        self.assertIn("スキル: 1（review）\nコマンド: /help で一覧\n", output)
+
+    def test_without_skills_neither_tool_nor_section(self) -> None:
+        _, run, output, _ = self.start()
+        session = run.call_args.args[0]
+        self.assertEqual(session.tools, DEFAULT_TOOLS)
+        # 既定の指示は「# スキル」の節に触れるが、節の見出しの行は無い
+        self.assertNotIn("\n# スキル\n", session.system)
+        self.assertIn("スキル: 無し\n", output)
+
+    def test_section_stays_with_instructions_file(self) -> None:
+        self.write_skill("review", "本文")
+        path = self.cwd / "short.md"
+        path.write_text("短い指示", encoding="utf-8")
+        _, run, _, _ = self.start("--system-prompt-file", str(path))
+        system = run.call_args.args[0].system
+        self.assertTrue(system.startswith("短い指示\n\n# 環境\n"))
+        self.assertTrue(system.endswith("- review: 本文"))
+
+    def test_second_trace_record_is_skills(self) -> None:
+        self.write_skill("review", "本文")
+        self.start()
+        (path,) = self.traces.iterdir()
+        second = json.loads(path.read_text(encoding="utf-8").splitlines()[1])
+        self.assertEqual(second["type"], "skills")
+        self.assertEqual(
+            second["skills"],
+            [
+                {
+                    "name": "review",
+                    "source": ".local-coding-agent/skills/review/SKILL.md",
+                    "description": "本文",
+                }
+            ],
+        )
+
+    def test_rule_for_load_skill_is_read_without_skills(self) -> None:
+        self.write_settings('{"permissions": {"deny": ["load_skill"]}}')
+        code, run, _, errors = self.start()
+        self.assertEqual(code, 0, errors)
+        self.assertEqual(
+            [str(rule) for rule in run.call_args.args[0].permissions.deny],
+            ["load_skill"],
+        )
 
 
 class DirectoryTest(MainTestCase):
