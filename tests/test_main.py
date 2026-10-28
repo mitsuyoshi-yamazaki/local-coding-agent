@@ -118,6 +118,10 @@ class PermissionsAtStartTest(MainTestCase):
         self.assertEqual(run.call_args.args[0].permissions.mode, "allow-all")
         self.assertIn("許可: allow-all・規則 0（設定ファイル無し）\n", output)
 
+    def test_start_lines_end_with_how_to_list_commands(self) -> None:
+        _, _, output, _ = self.start()
+        self.assertTrue(output.endswith("コマンド: /help で一覧\n"))
+
     def test_permission_mode_overrides(self) -> None:
         self.write_settings('{"permissions": {"mode": "ask"}}')
         _, run, _, _ = self.start("--permission-mode", "accept-edits")

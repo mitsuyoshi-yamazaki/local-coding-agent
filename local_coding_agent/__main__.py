@@ -102,6 +102,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     sys.stdout.write(f"走行の記録: {trace.path}\n")
     sys.stdout.write(f"指示: {args.system_prompt_file or '既定'}\n")
     sys.stdout.write(describe(loaded) + "\n")
+    sys.stdout.write("コマンド: /help で一覧\n")
     session = Session(
         model=OllamaChat(host=args.host, model=args.model),
         system=system,

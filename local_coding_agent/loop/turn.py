@@ -4,9 +4,9 @@
 を繰り返し、道具を呼ばない応答が来たら終える。
 """
 
-from dataclasses import replace
+from dataclasses import dataclass, replace
 
-from local_coding_agent.loop.model_call import call_model
+from local_coding_agent.loop.model_call import Outcome, call_model
 from local_coding_agent.loop.session import Session
 from local_coding_agent.loop.tool_call import run_tool_calls
 from local_coding_agent.model.messages import (
@@ -27,36 +27,62 @@ ERROR_NOTE = "（誤りで、この回が途中で止まった）"
 THINKING_ONLY = "（推論だけで終わった）"
 
 
+@dataclass(frozen=True)
+class TurnResult:
+    """1回の依頼を処理した結果。"""
+
+    history: tuple[Message, ...]
+    # その回で最後に終わりまで届いた応答の、入力のトークン数（prompt_eval_count）。
+    # 1つも届かなかったか、モデルの API が数えなかったら None
+    input_tokens: int | None = None
+
+
 def run_turn(
-    session: Session, history: tuple[Message, ...], text: str, turn: int
-) -> tuple[Message, ...]:
-    """1回の依頼を処理し、新しい履歴を返す。
+    session: Session,
+    history: tuple[Message, ...],
+    text: str,
+    turn: int,
+    command: str | None = None,
+) -> TurnResult:
+    """1回の依頼を処理し、新しい履歴を返す。command は、自作のコマンドで送るときの、打った行。
 
     回数の上限は無く、止めるのは人の Ctrl-C である。止めた回と誤りの回は、済んだ歩み
     （応答と、その呼び出しの結果）までを履歴に残す。済んだ歩みが無ければ、元の履歴を返す。
     """
-    messages = (*history, user_text(text, sent_at=session.now()))
+    messages = (*history, user_text(text, sent_at=session.now(), command=command))
     step = 0
+    tokens: int | None = None
     try:
         while True:
             step += 1
             outcome = call_model(session, messages, turn, step)
             if outcome.status != "done":
-                return _stopped(session, history, messages, outcome.status == "error")
+                error = outcome.status == "error"
+                kept = _stopped(session, history, messages, error)
+                return TurnResult(kept, tokens)
+            tokens = _input_tokens(outcome, tokens)
             reply = assistant_message(outcome.text, outcome.tool_uses, outcome.thinking)
             if not outcome.tool_uses:
                 if not outcome.text.strip():
                     session.output.write(THINKING_ONLY + "\n")
-                return (*messages, reply)
+                return TurnResult((*messages, reply), tokens)
             results = run_tool_calls(session, outcome.tool_uses, turn, step)
             messages = (*messages, reply, tool_results(results.blocks))
             if results.stopped:
                 session.output.write("\n" + CANCELLED + "\n")
-                return _stopped(session, history, messages, error=False)
+                kept = _stopped(session, history, messages, error=False)
+                return TurnResult(kept, tokens)
     except KeyboardInterrupt:
         # 応答の途中と道具の途中の外で押された Ctrl-C（表示や記録の途中など）
         session.output.write("\n" + CANCELLED + "\n")
-        return _stopped(session, history, messages, error=False)
+        kept = _stopped(session, history, messages, error=False)
+        return TurnResult(kept, tokens)
+
+
+def _input_tokens(outcome: Outcome, before: int | None) -> int | None:
+    """終わりまで届いた応答の、入力のトークン数。モデルの API が数えなければ before。"""
+    counted = outcome.done.stats.get("prompt_eval_count") if outcome.done else None
+    return before if counted is None else counted
 
 
 def _stopped(

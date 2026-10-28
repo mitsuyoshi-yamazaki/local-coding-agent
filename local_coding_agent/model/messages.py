@@ -3,8 +3,9 @@
 使う塊は、推論（thinking）・本文（text）・道具の呼び出し（tool_use）・道具の結果（tool_result）
 である。
 
-利用者の発言は、メタデータとして送った時刻（sent_at）を持つ。Messages API の発言には無い欄で、
-モデルは文しか読めないので、送る直前に本文の前へ文として入れる（metadata_text）。
+利用者の発言は、メタデータとして送った時刻（sent_at）と、自作のコマンドで送ったならその行
+（command）を持つ。Messages API の発言には無い欄で、モデルは文しか読めないので、送る直前に
+本文の前へ文として入れる（metadata_text）。
 """
 
 from collections.abc import Mapping, Sequence
@@ -13,6 +14,9 @@ from datetime import datetime
 from typing import Literal
 
 type Role = Literal["user", "assistant"]
+
+# メタデータの文で、自作のコマンドの行の前に置く見出し。既定の指示が、この見出しを説明する
+COMMAND_LABEL = "コマンド: "
 
 
 @dataclass(frozen=True)
@@ -64,11 +68,17 @@ class Message:
     content: tuple[ContentBlock, ...]
     # 利用者が送った時刻。モデルの発言と、道具の結果の発言では None
     sent_at: datetime | None = None
+    # 自作のコマンドで送った発言なら、利用者が打った行（例: /fix test_a.py）。ほかは None
+    command: str | None = None
 
 
-def user_text(text: str, sent_at: datetime | None = None) -> Message:
+def user_text(
+    text: str, sent_at: datetime | None = None, command: str | None = None
+) -> Message:
     """本文だけの、利用者の発言を作る。"""
-    return Message(role="user", content=(TextBlock(text),), sent_at=sent_at)
+    return Message(
+        role="user", content=(TextBlock(text),), sent_at=sent_at, command=command
+    )
 
 
 def assistant_text(text: str) -> Message:
@@ -103,9 +113,14 @@ def text_of(message: Message) -> str:
 
 def metadata_text(message: Message) -> str:
     """発言のメタデータを、本文の前に入れる文にする。メタデータが無ければ空の文字列。"""
-    if message.sent_at is None:
+    sent_at = message.sent_at
+    lines = (
+        *((f"送った時刻: {_minutes(sent_at)}",) if sent_at is not None else ()),
+        *((COMMAND_LABEL + message.command,) if message.command is not None else ()),
+    )
+    if not lines:
         return ""
-    return f"<metadata>\n送った時刻: {_minutes(message.sent_at)}\n</metadata>\n"
+    return "<metadata>\n" + "".join(line + "\n" for line in lines) + "</metadata>\n"
 
 
 def _minutes(moment: datetime) -> str:
