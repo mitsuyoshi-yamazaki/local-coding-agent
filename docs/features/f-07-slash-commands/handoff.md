@@ -210,3 +210,20 @@ main 側のセッションが、人から来た問いと答え・直したこと
 - 答え（このアプリ）: 自作のコマンドは、ほぼそれだけである。ファイルの本文の `$ARGUMENTS` を置き換え（無ければ末尾に `ARGUMENTS:` を足し）、1つの依頼として今の会話に足して送る。足すのは `<metadata>` の `コマンド: <打った行>` だけで、許可・モデル・道具は変えない。ただし、ファイルは呼ぶたびに読み、送った発言は履歴に残るので、答えが毎回同じになるわけではない。組み込みの5つはプロンプトを送らず、ハーネスが会話・モードを直に扱う（モデルを呼ばない）
 - 答え（Claude Code）: 核は同じ（展開した中身が1つの発言として会話に入り、残る）。ただし、ひな形より多くを持つ: `` !`コマンド` ``（送る前にコマンドを走らせ、出力に置き換える）・`allowed-tools`・`disallowed-tools`（その回の許可と道具）・`model`・`effort`・`context: fork`（subagent で走らせる）・`hooks`・モデルが自分で呼ぶこと（自作のコマンドは skills にまとめられた）。組み込みのコマンドは、多くが決まった処理を直に行い、bundled skills（`/simplify`・`/debug` など）は指示をモデルに渡す（出典: https://code.claude.com/docs/en/skills ・ https://code.claude.com/docs/en/commands 。2026-10-28 に確かめた。文書の中の最も新しい版は v2.1.309）
 - 直したことは無い
+
+### Claude Code の動作検証（2026-10-28）
+
+- 頼み（持ち主）: Claude Code の方でも動作検証を行う。持ち主が `.tmp/f-07-project` で走らせているので、別のディレクトリで行う
+- 走らせ方: 材料を `.tmp/cc-f07-*` に写し、写しの `.local-coding-agent/settings.json` に `.claude/agent-settings.json`（モード `accept-edits`・`allow` は `run_command(python3 -m unittest*)`）を置いた。リポジトリの根で `--directory <写し>` を付け、標準入力に依頼のファイルを渡した。モデルは `qwen3.5:9b`。持ち主の走行と同じ Ollama を使ったので、時間はその影響を受けうる
+  - 問いへの答えも標準入力から読む（`permissions/confirm.py` の `confirm`）。問われうる行の後に行があると、その行が拒む理由として読まれる。そのため、モデルを呼ぶ行が依頼のファイルの最後に来るよう、走行を分けた
+- 結果（走行の記録は写しの `traces/` の下。git に入れていない）
+  - 組み込み（`cc-f07-builtin`・`20261028-213718`）: `/help`・`/mode`・`/context`・`/help x`・`/mode foo`・`/tmp を見て`・`/nosuch`・`/exit` は、画面も `command` の件も guide.md のとおり。`/exit` の後の `/context` は読まれなかった。`/help x` の文には「誤り:」が付かない（spec.md のとおり。`/mode foo` には付く）
+  - 会話を消す（`cc-f07-clear`・`20261028-213744`）: ` /review とは何か、一言で答えて`（頭に空白）は、空白を残したまま依頼として送られた。モデルは `/review` を知らないと答えた（自作のコマンドの名前は指示に入らない。モデルに知らせるのは F-08）。`/clear` の前の `/context` は「発言 4・2159 トークン」で、直前の数値の行の入力と同じ。`/clear` の後は「発言 0・まだ無い」で、次の要求の `messages` は system と依頼の2つだけだった。モデルは好きな色を知らず、`list_directory`・`read_file` で4歩探してから尋ね返した
+  - `/explain temperature.py`（`cc-f07-explain`・`20261028-214100`）: 1行の依頼。`temperature.py` を読み、2文で説明した。2歩・約 20 秒
+  - `/review temperature.py`（`cc-f07-review`・`20261028-214123`）: 送った発言は `<metadata>` に `コマンド: /review temperature.py`、本文の末尾に `ARGUMENTS: temperature.py`。`temperature.py` を読み、6行目の `- 32` を挙げた。2歩・約 38 秒
+  - `/fix test_temperature.py`（`cc-f07-fix`・`20261028-214204`）: 通らなかった。モデルはテストを `python3 test_temperature.py`・`pytest test_temperature.py -v` で走らせようとし、どちらも規則の `allow` に当たらず、問われて拒まれた。モデルは走らせ方を尋ね返して終わった。3歩
+  - `/fix python3 -m unittest test_temperature.py`（`cc-f07-fix-2`・`20261028-214557`）: 通った（判定の終了コード 0）。`$ARGUMENTS` が置き換わり、`対象のテスト: python3 -m unittest test_temperature.py` になった。テスト（終了コード 1）→ `test_temperature.py` を読む → `temperature.py` を読む → `edit_file` で `+ 32` に → テスト（終了コード 0）→ 答え。6歩・各歩の「全体」の和は約 69 秒
+  - `/mode ask` → `/fix test_temperature.py`（`cc-f07-mode`・`20261028-214308`）: `/mode` は `accept-edits`、`/mode ask` は `accept-edits → ask`、次の `/mode` は `ask`。`/fix` では `python test_temperature.py`・`python -m unittest test_temperature.py`（`python3` でないので規則に当たらない）などの3回が「モード ask」で問われて拒まれた。作業ディレクトリの中を読むのは問われなかった（F-06 のとおり）。モデルは直し方を説明して終わり、書こうとしなかったので、書く前の問いはこの走行では見ていない
+- 分かったこと
+  - `fix.md` はテストの走らせ方を書いていないので、モデルがコマンドを選ぶ（`python3 test_temperature.py`・`pytest`・`python -m unittest` など）。既定のモード `allow-all` ではどれも走るが、Claude Code の走らせ方の規則では `python3 -m unittest*` しか通らない。F-07 の誤りではない
+- 直したことは無い
