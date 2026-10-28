@@ -33,7 +33,7 @@ description: 長さの単位の変換を足す手順（引数: 足す変換。�
 → 8 行
 …（ここから、読み込んだ手順に沿って道具を呼ぶ）
 > /review convert.py
-[スキル] /review → .local-coding-agent/skills/review/SKILL.md（12 行を依頼として送る）
+[スキル] /review → .local-coding-agent/skills/review/SKILL.md（10 行を依頼として送る）
 …
 ```
 

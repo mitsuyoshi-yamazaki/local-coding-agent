@@ -206,3 +206,9 @@ main 側のセッションが、人から来た問いと答え・直したこと
 - 意味の衝突は無い（main はコードを触っていない）
 - 検査: テスト404件・`ruff check`・`ruff format --check`・mypy が通った
 - main で直したことは無い
+
+### implementation.md の画面の例の行数（2026-10-29・main 側）
+
+- 問い（main 側から持ち主へ）: `implementation.md` の「使い方」の画面の例は `/review convert.py` を「12 行を依頼として送る」と書くが、材料の `review` で `skill_text` を実測すると10行（本文6行・空の行・スキルのディレクトリ・見出し・`checklist.md` の1行）だった。10行に直してよいか
+- 答え: 「良い」
+- 直したこと: `implementation.md` の画面の例を10行にした。`guide.md` は始めから10行と書いていたので、変えていない
