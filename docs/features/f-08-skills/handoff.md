@@ -195,3 +195,14 @@ main は分岐の後に commit を積んでいない（2026-10-28）。main で 
 ## 問いと答えの記録
 
 main 側のセッションが、人から来た問いと答え・直したことを足す。
+
+### 取り込み（2026-10-29・main 側）
+
+- `/merge-feature f-08-skills` で取り込んだ。取り込んだ commit は `67ebd42`、基点（取り込む前の main）は `a0e73a0`
+- 早送りにはならなかった。main は分岐（`4fe4670`）の後に、F-07 の確認の間の commit を5つ積んでいた（`5e527df`・`5d225e2`・`25cefe6`・`bba0489`・`a0e73a0`）。触ったのは `README.md`・`docs/features.md`・`docs/features/f-07-slash-commands/` の下だけで、コードは触っていない
+- 衝突したファイルと解き方:
+  - `README.md`: 使い方の材料の項。main は F-07 の材料の見出しを「コマンドを試す材料」から「slash commands を試す材料」に直し（`5e527df`。持ち主の答え）、branch は F-07 の項の後に「スキルを試す材料」を足していた。main の見出しを残し、branch の F-08 の項を足した
+  - `docs/features.md`: 表の F-07 の行。main は「計測の結果」へのリンクを足し（`a0e73a0`）、branch は F-08 の行を足していた。main の F-07 の行を残し、branch の F-08 の行を足した
+- 意味の衝突は無い（main はコードを触っていない）
+- 検査: テスト404件・`ruff check`・`ruff format --check`・mypy が通った
+- main で直したことは無い
