@@ -181,3 +181,19 @@ F-07 は、main の次のファイルを直した。main は分岐の後に `01f
 ## 問いと答えの記録
 
 main 側のセッションが、人から来た問いと答え・直したことを足す。
+
+### main への取り込み（2026-10-28）
+
+- `/merge-feature f-07-slash-commands` で取り込んだ（`40a8ab7`。基点 `2efe1b4`）。main は分岐（`eceac9c`）の後に、上の「main 側に頼むこと」が挙げた `01f8c74`・`8b9aed9`・`c1bcf86` のほかに、F-06 の確認の間の直し（`de294e6`: 規則に理由を添え、拒んだときに理由と意図をモデルに伝える・`baca12d`: コマンドのコメントの中の引用符で deny が外れるのを直し、問いの答えに拒む理由を書ける）と、F-06 の記録を積んでいた。早送りにはならなかった
+- 衝突したのは `README.md` と `docs/features.md`。上の「main と衝突しそうな所」と、worktree 側の `git merge-tree`（衝突は出なかった）は、`de294e6` より前の main で見たもので、main の F-06 の直しが同じ所を触っていた
+  - `README.md`: main が使い方の「許可」の項の最後の行（照合の限界とその文書へのリンク）と「実行の前の問い」の項（`[y/N/拒む理由]`・規則の理由）を直し、branch がその直後に「slash commands」の項を足した。main の2行を残し、branch の「slash commands」の項をその後に置いた。「Ctrl-D」「走行の記録」と材料の項は、branch の直しのまま（main は触っていない）
+  - `docs/features.md`: main が F-06 の行に「計測の結果」を足し、branch が F-07 の行を足した。main の F-06 の行を残し、F-07 の行をその下に置いた
+- 意味の衝突は無かった
+  - main の F-06 の直しは `permissions/policy.py`（`Decision.rule_reason`・`denial`・`DENIED_NOTE`）・`permissions/confirm.py`（答えの型）・`loop/tool_call.py`・`permissions/settings.py` で、F-07 が使う `MODES`・`is_mode`・`Permissions.mode` は変わっていない。`/mode` は `replace(permissions, mode=…)` なので、理由を添えた規則もそのまま残る
+  - `context/system_prompt.py` は、branch が `<metadata>` の項を、main が「規則で拒んだ」の項と「理由: 」の項を直した（間に1行あり、自動で合わさった）
+  - `run_turn` の戻り値が `TurnResult` になったが、main は分岐の後に `run_turn` の呼び出しを足していない。ほかのテストの呼び出し（`test_file_tools.py`・`test_permission_loop.py`・`test_run_command.py`）は戻り値を使わない（`git grep` で確かめた）
+  - `--directory`（`01f8c74`）と合わせて: `handle_line` は `find_custom(conversation.session.cwd, …)`、`/help` は `list_custom(conversation.session.cwd, …)` を呼び、`main` は `--directory` を解いたパスを `Session.cwd` にするので、`--directory` の下の `.local-coding-agent/commands/` を読む（コードで確かめた。テストは無い）
+- 検査: テスト356件（main の289件に、F-07 の67件）・`ruff check`・`ruff format --check`・mypy が通った
+- main で直したことは無い
+- 持ち主のメモ `docs/features/f-07-slash-commands/memo.md` を空で作った
+- 前の機能の guide.md（F-05・F-06）は、F-07 で動かなくなった所が無い。どちらも依頼の文が `/` で始まらず、起動の3行目・`[許可]` の行・走行の記録の `tool` の件は変わらない（起動の行が1行増え、`command` の件はコマンドを打ったときだけ入る）。Ctrl-C と EOF の扱いも基点と同じである。注釈は足していない
