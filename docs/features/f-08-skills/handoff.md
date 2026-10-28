@@ -212,3 +212,22 @@ main 側のセッションが、人から来た問いと答え・直したこと
 - 問い（main 側から持ち主へ）: `implementation.md` の「使い方」の画面の例は `/review convert.py` を「12 行を依頼として送る」と書くが、材料の `review` で `skill_text` を実測すると10行（本文6行・空の行・スキルのディレクトリ・見出し・`checklist.md` の1行）だった。10行に直してよいか
 - 答え: 「良い」
 - 直したこと: `implementation.md` の画面の例を10行にした。`guide.md` は始めから10行と書いていたので、変えていない
+
+### Claude Code の動作検証（2026-10-29）
+
+- 頼み（持ち主）: 「あなたの方で課題の実施を行え」「.tmp/f-08-project/ は私が使っているため触るな」
+- 走らせ方: `tasks/f-08-skills/README.md` のとおりに、材料を `.tmp/cc-f08-*` に写した（`project/` を写し、`.local-coding-agent/skills/` にスキルを写す）。写しの `.local-coding-agent/settings.json` に `.claude/agent-settings.json`（モード `accept-edits`・`allow` は `run_command(python3 -m unittest*)`）を置いた。リポジトリの根で `--directory <写し>` を付け、標準入力に依頼のファイルを渡した。モデルは `qwen3.5:9b`。課題ごとに新しい写しで、1つずつ順に走らせた。持ち主の走行と同じ Ollama を使ったので、時間はその影響を受けうる
+- 結果（走行の記録は写しの `traces/` の下。git に入れていない。時間は各歩の「全体」の和）
+  - 合う依頼で読み込む（`cc-f08-add`・`20261029-084630`）: 通った（`judge.py` の4つが全て通り、終了コード 0）。1歩目で `load_skill {"name": "add-conversion", "arguments": "inch → cm"}` を呼んだ（引数は説明の「例: inch → cm」と同じ形）。その後、手順どおり `convert.py`・`test_convert.py` を読んで `RATES` と `CASES`（2行）に足し、`CHANGELOG.md` を読んで「## 未リリース」の下に `- 変換 inch → cm を足した` を足した。手順の4.の `python -m unittest` は、規則の `allow`（`python3 -m unittest*`）に合わず、問われて拒まれた。モデルは `python -m unittest 2>&1`（`timeout` 30）で試し直し、また拒まれ、手で確かめるよう書いて終えた。10歩・約 198 秒
+  - 付いているファイルを読む（`cc-f08-review`・`20261029-085013`）: 1歩目で `load_skill {"name": "review", "arguments": "convert.py"}`、2歩目で `convert.py` と `.local-coding-agent/skills/review/checklist.md` を同じ応答の中で読み、4つの観点の見出しで答えた。ファイルは書き換えなかった。3歩・約 94 秒。答えの中身には誤りがある（Claude Code の読み）: 1.で「`(target, source)` が `RATES` にあれば `value / RATES[(target, source)]` を返す処理は意味をなさない」と書くが、逆向きの変換として正しい。4.の「逆方向の変換比率」も同じ誤り。表に無い組（`mile` → `m` など）で `ValueError` になる点は、4.の「連鎖変換」として当たっている
+  - 合わない依頼で読まない（`cc-f08-explain`・`20261029-085200`）: `load_skill` を呼ばなかった。`list_directory` → `read_file convert.py` → 1行で答えた（「長さの単位（km ↔ m, mile ↔ km など）を変換する Python モジュール」）。3歩・約 26 秒
+  - `/<名前>` で呼ぶ（`cc-f08-slash`・`20261029-085235`）: `[スキル] /review → .local-coding-agent/skills/review/SKILL.md（10 行を依頼として送る）`。`command` の件は `kind: skill`・`turn: 1`・`source`・`text`（付いているファイルの一覧を含む）。要求の最後の発言は `<metadata>\n送った時刻: …\nスキル: /review convert.py\n</metadata>\n` で始まった。モデルは `load_skill` で読み込み直さず、1歩目で `convert.py` と `checklist.md` を読み、4つの観点の見出しで答えた。2歩・約 79 秒。答えの中身には誤りがある（Claude Code の読み）: 1.で「km → m の逆変換が RATES に存在しないため例外となる」と書くが、`m` → `km` は逆向きで求まる。4.で「コード自体にはテストが含まれておらず」と書くが、`test_convert.py` を読んでいない
+  - 一覧（`cc-f08-hello`・`20261029-084536`）: `/help` は guide.md の画面のとおり（スキルの節に3つ・名前の列は `/add-conversion` の幅）。`command` の件は `kind: builtin`、要求は増えなかった
+  - 一覧の大きさ（`cc-f08-hello`・`cc-f08-noskills`・`20261029-084434`）: `こんにちは` の1つ目の要求の `prompt_eval_count` は、スキル有りが 2446、スキル無しが 2121 で、差は 325 トークン（「# スキル」の節 290 字と、`load_skill` の定義の分）。写しのディレクトリの名前が違うので、「# 環境」の節の作業ディレクトリも数トークン違いうる。スキル無しの写しの要求は、`tools` に `load_skill` が無く、system prompt に「# スキル」の節が無かった。2つ目の件（`skills`）は、スキル有りが3つ、スキル無しは `skills`・`unusable` とも空
+  - 本文の大きさ: `load_skill` の前と後の要求の `prompt_eval_count` は、`add-conversion` が 2453 → 2720（+267。結果は 319 字）、`review` が 2449 → 2661（+212。結果は 238 字）。増えた分には、モデルの呼び出しの発言も入る
+  - `load_skill` の `tool` の件は、`permission` が `{"decision": "allow", "reason": "モード accept-edits", "rule": null, …}`・`confirmed` が `null` で、画面に `[許可]` の行は出なかった（読む道具をモードで通したため）
+- 分かったこと
+  - 3つの依頼のどれでも、モデルは合うスキルだけを読み込み、合わない依頼では読まなかった。付いているファイル `checklist.md` は、モデルの道でも利用者の道でも、一覧のパスのまま読んだ
+  - `add-conversion` の手順は `python -m unittest` と書くので、Claude Code の走らせ方の規則（`python3 -m unittest*`）では走らない。既定のモード `allow-all` では走る（この機械で `python` が見つかるかは確かめていない）。F-07 の `fix.md` と同じく、F-08 の誤りではない
+  - レビューの答えは、2回とも観点の形には沿ったが、中身に誤りを含んだ。判定は持ち主が行う
+- 直したことは無い
