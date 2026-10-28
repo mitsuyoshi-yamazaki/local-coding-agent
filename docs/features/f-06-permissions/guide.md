@@ -65,15 +65,15 @@ PYTHONPATH=../.. ../../.venv/bin/python -m local_coding_agent --model qwen3.5:9b
 
 - `.venv/bin/python -m unittest tests.test_permission_policy tests.test_permission_command tests.test_permission_rules tests.test_permission_settings tests.test_permission_loop`: F-06 で足した5つのファイルの73件。約 0.1 秒（実測）
 - `.venv/bin/python -m unittest tests.test_main`: 起動のときに設定ファイルが届くこと（`PermissionsAtStartTest`）を含む
-- `.venv/bin/python -m unittest`: 全て（274件）
+- `.venv/bin/python -m unittest`: 全て（276件）
 
 ## 読む順
 
-1. [__main__.py](../../../local_coding_agent/__main__.py#L67) の `main`
-   - 入口: `python -m local_coding_agent`（[L112](../../../local_coding_agent/__main__.py#L112)）
-   - 分かること: [L78](../../../local_coding_agent/__main__.py#L78) で設定ファイルを読み（`load_permissions`）、誤りなら [L79](../../../local_coding_agent/__main__.py#L79) で終了コード 2 で終える。[L86](../../../local_coding_agent/__main__.py#L86) で走行の記録の1件目、[L89](../../../local_coding_agent/__main__.py#L89) で起動の3行目を書き、[L100](../../../local_coding_agent/__main__.py#L100) で `Session` に渡す。`--permission-mode` は [`parse_args`](../../../local_coding_agent/__main__.py#L59-L63)。変わったのは約30行
+1. [__main__.py](../../../local_coding_agent/__main__.py#L74) の `main`
+   - 入口: `python -m local_coding_agent`（[L127](../../../local_coding_agent/__main__.py#L127)）
+   - 分かること: [L89](../../../local_coding_agent/__main__.py#L89) で設定ファイルを読み（`load_permissions`）、誤りなら [L90](../../../local_coding_agent/__main__.py#L90) で終了コード 2 で終える。[L101](../../../local_coding_agent/__main__.py#L101) で走行の記録の1件目、[L104](../../../local_coding_agent/__main__.py#L104) で起動の3行目を書き、[L115](../../../local_coding_agent/__main__.py#L115) で `Session` に渡す。`--permission-mode` は [`parse_args`](../../../local_coding_agent/__main__.py#L60-L64)。変わったのは約30行（[L82-L86](../../../local_coding_agent/__main__.py#L82-L86) と [L96-L99](../../../local_coding_agent/__main__.py#L96-L99) の `--directory` は、取り込みの後に main で足したもの。下の「取り込みで branch から変えた所」）
 2. [settings.py](../../../local_coding_agent/permissions/settings.py) の [`load_permissions`](../../../local_coding_agent/permissions/settings.py#L41)・[`_read_json`](../../../local_coding_agent/permissions/settings.py#L73)・[`_permissions`](../../../local_coding_agent/permissions/settings.py#L89)・[`_object`](../../../local_coding_agent/permissions/settings.py#L107)・[`_rules`](../../../local_coding_agent/permissions/settings.py#L117)・[`describe`](../../../local_coding_agent/permissions/settings.py#L52)・[`trace_record`](../../../local_coding_agent/permissions/settings.py#L60)
-   - 入口: `main` の [L78](../../../local_coding_agent/__main__.py#L78)・[L86](../../../local_coding_agent/__main__.py#L86)・[L89](../../../local_coding_agent/__main__.py#L89)
+   - 入口: `main` の [L89](../../../local_coding_agent/__main__.py#L89)・[L101](../../../local_coding_agent/__main__.py#L101)・[L104](../../../local_coding_agent/__main__.py#L104)
    - 分かること: 設定ファイルの形と、誤りにする所（知らない欄・型の違い・知らないモード・規則の誤り・読めない JSON）。ファイルが無ければ `Permissions()`（`allow-all`・規則無し）。約130行
 3. [tool_call.py](../../../local_coding_agent/loop/tool_call.py#L84) の `execute`
    - 入口: [`run_tool_call`](../../../local_coding_agent/loop/tool_call.py#L72) が [L77](../../../local_coding_agent/loop/tool_call.py#L77) で呼ぶ。`run_tool_call` は [`run_tool_calls`](../../../local_coding_agent/loop/tool_call.py#L53) から呼ばれる（F-03 からの入口）
@@ -92,7 +92,7 @@ PYTHONPATH=../.. ../../.venv/bin/python -m local_coding_agent --model qwen3.5:9b
    - 入口: `policy._call` の [L91-L97](../../../local_coding_agent/permissions/policy.py#L91-L97) と `_by_mode` の [L139](../../../local_coding_agent/permissions/policy.py#L139)
    - 分かること: `changes` の真偽を、種類（`read`・`edit`・`command`）に替えた。判定は、道具の入力の欄の名前を知らずに、照らす文字列を道具から受ける。約30行
 8. [session.py](../../../local_coding_agent/loop/session.py#L35) の `permissions` と、[system_prompt.py](../../../local_coding_agent/context/system_prompt.py#L18-L26) の「できること」・[L50](../../../local_coding_agent/context/system_prompt.py#L50) の「規則で拒んだ: 」
-   - 入口: `Session` は `main` の [L90](../../../local_coding_agent/__main__.py#L90) で作る。既定の指示は `main` の [L70](../../../local_coding_agent/__main__.py#L70) の `read_instructions`
+   - 入口: `Session` は `main` の [L105](../../../local_coding_agent/__main__.py#L105) で作る。既定の指示は `main` の [L77](../../../local_coding_agent/__main__.py#L77) の `read_instructions`
    - 分かること: モデルが許可について知るのは、この指示と、拒まれた結果の文だけである（モードや規則の一覧は渡さない）。約10行
 9. テスト: [test_permission_policy.py](../../../tests/test_permission_policy.py) の [`ModeTest`](../../../tests/test_permission_policy.py#L56)（モードの表）→ [`RuleOrderTest`](../../../tests/test_permission_policy.py#L103) → [`FileRuleTest`](../../../tests/test_permission_policy.py#L151) → [`CommandRuleTest`](../../../tests/test_permission_policy.py#L175) → [test_permission_command.py](../../../tests/test_permission_command.py#L6) → [test_permission_rules.py](../../../tests/test_permission_rules.py#L24) → [test_permission_settings.py](../../../tests/test_permission_settings.py#L18) → [test_permission_loop.py](../../../tests/test_permission_loop.py#L21)（偽物のモデルと本物の道具）→ [test_main.py](../../../tests/test_main.py#L77) の `PermissionsAtStartTest`
    - 偽物の `Session` の許可の既定は `ask` である（[fakes.py](../../../tests/fakes.py#L19) の `ASK`）。本物の既定（`allow-all`）と違うのは、F-05 までのテストが、変更を伴う道具を問う前提で書いてあるためである。約820行
@@ -146,4 +146,5 @@ PYTHONPATH=../.. ../../.venv/bin/python -m local_coding_agent --model qwen3.5:9b
 ### 取り込みで branch から変えた所
 
 - `docs/features.md` の表だけが衝突した。main の F-05 の行（計測の結果と確かめる案内へのリンク）を残し、branch の F-06 の行をその下に置いた
-- 取り込みの後に、`permissions/confirm.py` の docstring を直した（上）。コードの振る舞いは branch のままである
+- 取り込みの後に、`permissions/confirm.py` の docstring を直した（上）
+- 取り込みの後に、main で起動の引数 `--directory <パス>` を足した（Claude Code が、課題の写しを作業ディレクトリにして実物のモデルで走らせるため。持ち主の承認）。指したディレクトリを作業ディレクトリにし、許可の設定ファイル・環境の知らせ・道具のパス・走行の記録（`<パス>/traces/`）がそこを基にする。ディレクトリでなければ、起動の前に終了コード 2 で終える。テストは [test_main.py](../../../tests/test_main.py) の `DirectoryTest`。付けなければ、振る舞いは branch のままである

@@ -144,5 +144,46 @@ class PermissionsAtStartTest(MainTestCase):
         self.assertEqual(list(self.traces.iterdir()), [])
 
 
+class DirectoryTest(MainTestCase):
+    def setUp(self) -> None:
+        super().setUp()
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.directory = Path(directory.name).resolve()
+
+    def start(self, directory: Path) -> tuple[int, mock.MagicMock, str, str]:
+        with (
+            mock.patch("local_coding_agent.cli.repl.run") as run,
+            redirect_stdout(io.StringIO()) as output,
+            redirect_stderr(io.StringIO()) as errors,
+        ):
+            code = main(["--model", "m", "--directory", str(directory)])
+        return code, run, output.getvalue(), errors.getvalue()
+
+    def test_directory_is_the_working_directory(self) -> None:
+        settings = self.directory / SETTINGS_PATH
+        settings.parent.mkdir()
+        settings.write_text('{"permissions": {"mode": "ask"}}', encoding="utf-8")
+        # 走行の記録の置き場を、既定の相対パスに戻す
+        with mock.patch("local_coding_agent.__main__.TRACE_DIRECTORY", Path("traces")):
+            code, run, output, _ = self.start(self.directory)
+        self.assertEqual(code, 0)
+        session = run.call_args.args[0]
+        self.assertEqual(session.cwd, self.directory)
+        self.assertEqual(session.permissions.mode, "ask")
+        self.assertIn(f"作業ディレクトリ: {self.directory}", session.system)
+        (trace,) = (self.directory / "traces").iterdir()
+        self.assertIn(f"走行の記録: {trace}\n", output)
+
+    def test_not_a_directory_stops_before_start(self) -> None:
+        missing = self.directory / "no-such"
+        code, run, output, errors = self.start(missing)
+        self.assertEqual(code, 2)
+        self.assertIn(f"作業ディレクトリにできない（{missing}）", errors)
+        self.assertEqual(output, "")
+        run.assert_not_called()
+        self.assertEqual(list(self.traces.iterdir()), [])
+
+
 if __name__ == "__main__":
     unittest.main()

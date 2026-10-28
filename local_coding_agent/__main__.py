@@ -1,5 +1,6 @@
 """起動: python -m local_coding_agent --model <モデルのタグ> [--host <URL>]
 [--system-prompt-file <パス>] [--show-thinking] [--permission-mode <モード>]
+[--directory <パス>]
 """
 
 import argparse
@@ -61,6 +62,12 @@ def parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         choices=MODES,
         help=f"許可のモード。設定ファイル（{SETTINGS_PATH}）のモードを上書きする",
     )
+    parser.add_argument(
+        "--directory",
+        type=Path,
+        help="作業ディレクトリ（既定: 起動したディレクトリ）。設定ファイル・道具のパス・"
+        "走行の記録は、ここを基にする",
+    )
     return parser.parse_args(argv)
 
 
@@ -72,7 +79,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         path = args.system_prompt_file
         sys.stderr.write(f"指示のファイルを読めない（{path}）: {error}\n")
         return 2
-    cwd = Path.cwd()
+    cwd = Path.cwd() if args.directory is None else args.directory.resolve()
+    if not cwd.is_dir():
+        message = f"作業ディレクトリにできない（{args.directory}）: ディレクトリが無い"
+        sys.stderr.write(message + "\n")
+        return 2
     try:
         home = Path.home()
         loaded = load_permissions(cwd, DEFAULT_TOOLS, home, args.permission_mode)
@@ -82,7 +93,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 2
     environment = collect_environment(cwd)
     system = build_system_prompt(instructions, environment_section(environment))
-    trace = TraceWriter(trace_path(TRACE_DIRECTORY, datetime.now()))
+    # 表示する行が短くなるよう、渡されたままのパスを基にする
+    traces = (
+        TRACE_DIRECTORY if args.directory is None else args.directory / TRACE_DIRECTORY
+    )
+    trace = TraceWriter(trace_path(traces, datetime.now()))
     trace.write(trace_record(loaded))
     sys.stdout.write(f"走行の記録: {trace.path}\n")
     sys.stdout.write(f"指示: {args.system_prompt_file or '既定'}\n")
