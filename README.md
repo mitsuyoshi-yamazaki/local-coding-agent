@@ -151,7 +151,7 @@ ollama pull gpt-oss:20b
 - **編集を試す材料**: 通らないテストを持つ小さなプロジェクトが、`tasks/f-04-file-edit/project/` にある。写しを作業ディレクトリにして起動し、通ったかをテストの終了コードで判定する。写し方と判定のコマンドは `tasks/f-04-file-edit/README.md` に、依頼の例は [F-04 の文書](docs/features/f-04-file-edit/implementation.md#試すための材料) にある
 - **コマンドを試す材料**: テストが失敗する小さなプロジェクトと、テストが終わらない小さなプロジェクトが、`tasks/f-05-run-command/` にある。写し方と判定のコマンドは `tasks/f-05-run-command/README.md` に、依頼の例は [F-05 の文書](docs/features/f-05-run-command/implementation.md#試すための材料) にある
 - **許可を試す材料**: 消すのを拒む設定と、秘密のファイルを読むのを拒む設定を置いた小さなプロジェクトと、編集とテストを問わない設定ファイルが、`tasks/f-06-permissions/` にある。写し方と課題は `tasks/f-06-permissions/README.md` にある
-- **コマンドを試す材料**: 通らないテストと、自作のコマンドのファイル3つを持つ小さなプロジェクトが、`tasks/f-07-slash-commands/project/` にある。写し方と課題と判定のコマンドは `tasks/f-07-slash-commands/README.md` にある
+- **slash commands を試す材料**: 通らないテストと、自作のコマンドのファイル3つを持つ小さなプロジェクトが、`tasks/f-07-slash-commands/project/` にある。写し方と課題と判定のコマンドは `tasks/f-07-slash-commands/README.md` にある
 
 ## 開発
 

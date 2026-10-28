@@ -132,7 +132,7 @@ PYTHONPATH=../.. ../../.venv/bin/python -m local_coding_agent --model qwen3.5:9b
 
 ### 文書・試す材料・設定
 
-- README: 「できること」に F-07 の行、画面の例に起動の4行目、使い方に「slash commands」と「コマンドを試す材料」（F-07 の材料）の項を足し、「Ctrl-D」（`/exit` と同じ）と「走行の記録」（コマンドの件と F-07 の文書へのリンク）の項を直した
+- README: 「できること」に F-07 の行、画面の例に起動の4行目、使い方に「slash commands」と「slash commands を試す材料」の項を足し、「Ctrl-D」（`/exit` と同じ）と「走行の記録」（コマンドの件と F-07 の文書へのリンク）の項を直した
 - [コーディングエージェントの仕組み](../../how-coding-agents-work.md): 「コマンド（slash commands）」の節を足し、「ハーネスとモデルの分担」の表のハーネスの欄に「利用者のコマンドの処理」を足した
 - [作る機能](../../features.md): F-07 の行を足した
 - `tasks/f-07-slash-commands/`: 通らないテストを持つ小さなプロジェクトと、自作のコマンドのファイル3つ（`$ARGUMENTS` と前付けを持つ `fix.md`・`description` を `"…"` で囲む `explain.md`・前付けも `$ARGUMENTS` も無い `review.md`）。判定は F-05 の `judge.py` を使う
