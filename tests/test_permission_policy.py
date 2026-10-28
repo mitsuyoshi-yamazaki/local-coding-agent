@@ -215,6 +215,11 @@ class CommandRuleTest(PolicyTestCase):
             with self.subTest(command=command):
                 self.assertEqual(self.command(permissions, command).verdict, "deny")
 
+    def test_deny_is_not_hidden_by_a_quote_in_a_comment(self) -> None:
+        permissions = self.permissions("allow-all", deny=["run_command(rm *)"])
+        decision = self.command(permissions, "echo hi # don't\nrm x")
+        self.assertEqual(decision.verdict, "deny")
+
     def test_allow_needs_every_part(self) -> None:
         permissions = self.permissions(
             "ask", allow=["run_command(python3 -m unittest*)", "run_command(tail *)"]

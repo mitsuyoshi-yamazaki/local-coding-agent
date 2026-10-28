@@ -1,9 +1,10 @@
 """コマンドを、許可の規則と照らす部分に分ける。
 
 引用符（'…'・"…"・$'…'）の外の &&・||・;・|・&・改行で分ける。リダイレクトの >&・&>・<&
-（2>&1 など）の & では分けない。分けた部分は、空白の並びを1つの空白にし、頭のグループの括弧・
-否定・予約語（( { ! if then do など）を除く。シェルの文法を全て解くのではなく、規則と照らすのに
-要る所だけを見る。
+（2>&1 など）の & では分けない。語の始まりの # から行末まではコメントで、中の引用符と区切りを
+見ない。分けた部分は、空白の並びを1つの空白にし、頭のグループの括弧・否定・予約語
+（( { ! if then do など）を除く。シェルの文法を全て解くのではなく、規則と照らすのに要る所だけを
+見る。
 """
 
 import re
@@ -15,6 +16,8 @@ SEPARATORS = ("&&", "||", ";", "|", "&", "\n")
 SUBSTITUTIONS = ("$(", "`", "<(", ">(")
 # 部分の頭にあっても、走るコマンドの名前ではないもの（グループの括弧・否定・予約語）
 _PREFIX = re.compile(r"^(?:[({!]\s*|(?:if|then|do|else|elif|while|until|time)\s+)+")
+# この字の後の # は、語の始まりなのでコメントになる（空白・改行と、演算子の字）
+_BEFORE_COMMENT = " \t\n;&|()<>"
 
 
 def split_command(command: str) -> tuple[str, ...]:
@@ -66,6 +69,11 @@ def _separators(command: str) -> Iterator[tuple[int, int]]:
             index += 1
         elif char in "'\"":
             quote = char
+        elif char == "#" and (index == 0 or command[index - 1] in _BEFORE_COMMENT):
+            # コメントは行末まで。中の ' と区切りを見ず、行末の改行を、次に区切りとして見る
+            end = command.find("\n", index)
+            index = len(command) if end < 0 else end
+            continue
         else:
             width = _separator_width(command, index)
         if width:

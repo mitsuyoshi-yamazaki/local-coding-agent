@@ -11,7 +11,7 @@ from dataclasses import dataclass
 
 from local_coding_agent.loop.session import Session
 from local_coding_agent.model.messages import ToolResultBlock, ToolUseBlock
-from local_coding_agent.permissions.confirm import REFUSED, confirm
+from local_coding_agent.permissions.confirm import confirm, refusal
 from local_coding_agent.permissions.policy import (
     VERDICT_WORDS,
     Decision,
@@ -110,8 +110,9 @@ def execute(session: Session, use: ToolUseBlock) -> ToolRun:
         _show_decision(session, decision)
     if decision.verdict == "allow":
         return _run(session, tool, use, preview, decision)
-    if not confirm(session.read_line):
-        return ToolRun(_error(use, REFUSED), False, None, preview, decision)
+    answer = confirm(session.read_line)
+    if not answer.allowed:
+        return ToolRun(_error(use, refusal(answer)), False, None, preview, decision)
     return _run(session, tool, use, preview, decision, confirmed=True)
 
 

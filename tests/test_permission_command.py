@@ -79,6 +79,31 @@ class SplitCommandTest(unittest.TestCase):
     def test_whitespace_runs_become_one_space(self) -> None:
         self.assertEqual(split_command("rm\t-rf   x"), ("rm -rf x",))
 
+    def test_quote_inside_comment_does_not_hide_next_line(self) -> None:
+        # コメントの中の ' は引用符ではない。改行の後の rm x は、別の部分として走る
+        for command, parts in (
+            ("echo hi # don't\nrm x", ("echo hi # don't", "rm x")),
+            ("ls;# it's\nrm x", ("ls", "# it's", "rm x")),
+            ("(# it's\nrm x)", ("# it's", "rm x)")),
+            ('echo a >#"x\nrm x', ('echo a >#"x', "rm x")),
+        ):
+            with self.subTest(command=command):
+                self.assertEqual(split_command(command), parts)
+
+    def test_separators_inside_comment_are_not_split(self) -> None:
+        # シェルは # から行末までを走らせないので、; の後ろは部分にしない
+        self.assertEqual(split_command("echo a # ; rm x"), ("echo a # ; rm x",))
+
+    def test_hash_inside_a_word_is_not_a_comment(self) -> None:
+        for command, parts in (
+            ("echo a#b; rm x", ("echo a#b", "rm x")),
+            ("echo $#; rm x", ("echo $#", "rm x")),
+            ("echo '#'; rm x", ("echo '#'", "rm x")),
+            (r"echo \#; rm x", (r"echo \#", "rm x")),
+        ):
+            with self.subTest(command=command):
+                self.assertEqual(split_command(command), parts)
+
     def test_ansi_c_quotes(self) -> None:
         # $'\'' は ' の1字。後ろの ; は引用符の外にある
         self.assertEqual(

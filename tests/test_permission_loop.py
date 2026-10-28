@@ -140,6 +140,16 @@ class PermissionInLoopTest(unittest.TestCase):
         self.assertEqual((self.cwd / "a.txt").read_text(encoding="utf-8"), "a\n")
         self.assertIs(self.record()["confirmed"], False)
 
+    def test_reason_typed_at_the_question_reaches_the_model(self) -> None:
+        call = ToolCall("c", "write_file", {"path": "a.txt", "content": "b\n"})
+        self.run_call(call, "ask", lines=("a.txt は残す",))
+        self.assertEqual(
+            self.result(),
+            ToolResultBlock("c", "利用者が実行を拒んだ。理由: a.txt は残す", True),
+        )
+        self.assertEqual((self.cwd / "a.txt").read_text(encoding="utf-8"), "a\n")
+        self.assertIs(self.record()["confirmed"], False)
+
     def test_allow_all_runs_edits_without_asking(self) -> None:
         call = ToolCall("c", "write_file", {"path": "a.txt", "content": "b\n"})
         self.run_call(call)
