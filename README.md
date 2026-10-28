@@ -15,6 +15,7 @@
 | [F-05 コマンドの実行と、結果を読んで直すループ](docs/features/f-05-run-command/implementation.md) | シェルのコマンドを走らせる道具（`run_command`）を渡す。モデルは、直した後にテストを走らせ、終了コードと出力を読んで、失敗していれば直す。人に確かめるときは、実行の前にコマンドを見せる。時間切れ（既定 120 秒）と Ctrl-C で、コマンドが起こしたプロセスまで止める |
 | [F-06 許可](docs/features/f-06-permissions/implementation.md) | 道具の呼び出しを、ハーネスが「通す・問う・拒む」に決める。決め方は、作業ディレクトリの設定ファイルに書いた規則（`allow`・`ask`・`deny`）と、モード（`ask`・`accept-edits`・`allow-all`）である。既定は `allow-all`（全部通す）。`run_command` の規則は、`&&`・`;`・`|` などで分けたコマンドの部分ごとに照らす |
 | [F-07 slash commands](docs/features/f-07-slash-commands/implementation.md) | `/` で始まる行を、ハーネスがコマンドとして処理する。組み込みの `/help`・`/clear`・`/context`・`/mode`・`/exit` はモデルを呼ばない。作業ディレクトリの `.local-coding-agent/commands/<名前>.md` に書いた手順を `/<名前>` で呼ぶと、引数を入れた中身を依頼としてモデルに送る |
+| [F-08 skills](docs/features/f-08-skills/implementation.md) | 作業ディレクトリの `.local-coding-agent/skills/<名前>/SKILL.md` に書いた手順書（スキル）の、名前と説明だけを指示に入れる。モデルが依頼に合うと判断したら、道具 `load_skill` で本文を読み込む。スキルのディレクトリに付いているファイルは、モデルが要るときに読む。利用者も `/<名前>` で呼べる |
 
 ## 要るもの
 
@@ -80,6 +81,7 @@ ollama pull gpt-oss:20b
 走行の記録: traces/20261024-153012.jsonl
 指示: 既定
 許可: allow-all・規則 0（設定ファイル無し）
+スキル: 無し
 コマンド: /help で一覧
 > 私は山田です
 はい、山田さん。
@@ -96,7 +98,7 @@ ollama pull gpt-oss:20b
 
 - `> ` に依頼を1行打ち、Enter で送る。応答は届いたそばから表示され、モデルを1回呼ぶたびに数値の1行が出る
 - **推論の文**: 推論を学習したモデル（Qwen3.5 など）は、本文の前に推論の文を出す。既定では表示せず、`--show-thinking` で表示する。どちらでも、推論の文は会話に残り、次の要求でモデルに戻される。応答が本文も道具の呼び出しも持たずに終わったときは、数値の1行の後に `（推論だけで終わった）` と出て、その回を終える
-- **道具**: モデルが道具を呼ぶと、呼び出しを `[道具] <名前> <入力>` の1行で、結果を `→ <行数> 行`（誤りなら `→ 誤り: …`）の1行で表示し、結果を渡してもう一度モデルを呼ぶ。モデルが道具を呼ばずに答えたら、その回を終える。使える道具は `read_file`（ファイルを行番号付きで読む）・`list_directory`（ディレクトリの中身を見る）・`write_file`（ファイルを丸ごと書く）・`edit_file`（ファイルの中の文字列を置き換える）・`run_command`（シェルのコマンドを走らせる）である。どこを読み書きし、どのコマンドを走らせてよいかは、許可の設定で決まる（下）
+- **道具**: モデルが道具を呼ぶと、呼び出しを `[道具] <名前> <入力>` の1行で、結果を `→ <行数> 行`（誤りなら `→ 誤り: …`）の1行で表示し、結果を渡してもう一度モデルを呼ぶ。モデルが道具を呼ばずに答えたら、その回を終える。使える道具は `read_file`（ファイルを行番号付きで読む）・`list_directory`（ディレクトリの中身を見る）・`write_file`（ファイルを丸ごと書く）・`edit_file`（ファイルの中の文字列を置き換える）・`run_command`（シェルのコマンドを走らせる）である。スキルがあれば、`load_skill`（スキルを読み込む）も渡す（下）。どこを読み書きし、どのコマンドを走らせてよいかは、許可の設定で決まる（下）
 - **コマンド**: `run_command` は、コマンドを `/bin/sh -c` で、毎回、作業ディレクトリ（既定は起動したディレクトリ。`--directory` で変えられる）で走らせる（`cd` は次のコマンドに残らない）。標準入力は空である。結果の1行は `→ 終了コード: <N>・<行数> 行` で、テストが通ったかが分かる。既定では 120 秒で時間切れになり、`→ 時間切れ: 120 秒で止めた・<行数> 行` になる。モデルに返す出力は 10,000 字までで、超えた分は間を省く
 - **許可**: 道具を呼ぶたびに、ハーネスが「通す・問う・拒む」を決める。設定は、作業ディレクトリの `.local-coding-agent/settings.json` に書き、起動のときに1度だけ読む。無ければ、全部通す（`allow-all`）。例:
 
@@ -143,15 +145,22 @@ ollama pull gpt-oss:20b
     ```
 
   - 自作のコマンドで送る発言には、送った時刻と並べて、打った行（`コマンド: /fix test_a.py`）が `<metadata>` に入る。その後は、打った依頼と同じく回が進む
+- **skills**: スキルは、作業ごとの手順書である。作業ディレクトリの `.local-coding-agent/skills/<名前>/SKILL.md` に書く（形は自作のコマンドのファイルと同じ）。起動のときに探し、起動の行に `スキル: 3（add-conversion・release・review）` のように出る
+  - モデルへの指示（system prompt）には、スキルの名前と説明だけを入れる（「# スキル」の節）。モデルは、依頼が説明に合えば、道具 `load_skill` を呼び、本文を読み込む。本文の `$ARGUMENTS` には、モデルが渡した引数が入る
+  - スキルのディレクトリに、`SKILL.md` のほかのファイル（観点の一覧・スクリプトなど）を置ける。ハーネスはその中身を読まず、パスの一覧を本文に添える。モデルは、要るときに `read_file` で読む
+  - 利用者も `/<名前> <引数>` で呼べる。組み込み → 自作のコマンド → スキルの順に探す。送る発言の `<metadata>` に、打った行（`スキル: /review convert.py`）が入る
+  - 一覧は起動のときに1度だけ探す。足したスキルは、起動し直すと使える。本文は、読み込むたびに読む。使えないスキル（名前の形が違う・`SKILL.md` が無い・読めない・本文が空）は、`/help` に理由が出る
+  - `load_skill` は読む道具で、許可のモードでは問わずに通る。規則は名前だけの `load_skill` が合う（`load_skill(review)` のような型は合わない）
 - **Ctrl-C**: 応答の途中・道具の実行の途中・問いの途中で押すと、その回を止める。コマンドの途中なら、コマンドと、コマンドが起こしたプロセスを止める。1回目の応答の途中なら、その回は次の回に送る会話に入らない。それより後なら、済んだ歩み（応答と道具の結果）までが会話に残り、止めたことの知らせが付く。モデルの誤りで止まった回も同じである
 - **Ctrl-D**: 終える（`/exit` と同じ）
-- **走行の記録**: 起動ごとに1つ、`traces/<起動の時刻>.jsonl` に書かれる。1行に1件で、送った JSON の全体と、受けた応答（推論の文を含む）・道具の呼び出しと結果・トークン数・時間が入る。1件目は、読んだ許可の設定である。コマンドの行ごとにも1件が入る。中身の欄は [F-01 の文書](docs/features/f-01-chat-and-trace/implementation.md#走行の記録)・[F-03 の文書](docs/features/f-03-tool-loop/implementation.md#走行の記録)・[F-04 の文書](docs/features/f-04-file-edit/implementation.md#走行の記録)・[F-06 の文書](docs/features/f-06-permissions/implementation.md#走行の記録)・[F-07 の文書](docs/features/f-07-slash-commands/implementation.md#走行の記録) にある。送った JSON には、system prompt・道具の定義・送った時刻を入れた発言が、モデルに渡した形のまま入る
+- **走行の記録**: 起動ごとに1つ、`traces/<起動の時刻>.jsonl` に書かれる。1行に1件で、送った JSON の全体と、受けた応答（推論の文を含む）・道具の呼び出しと結果・トークン数・時間が入る。1件目は読んだ許可の設定、2件目は探したスキルの一覧である。コマンドの行ごとにも1件が入る。中身の欄は [F-01 の文書](docs/features/f-01-chat-and-trace/implementation.md#走行の記録)・[F-03 の文書](docs/features/f-03-tool-loop/implementation.md#走行の記録)・[F-04 の文書](docs/features/f-04-file-edit/implementation.md#走行の記録)・[F-06 の文書](docs/features/f-06-permissions/implementation.md#走行の記録)・[F-07 の文書](docs/features/f-07-slash-commands/implementation.md#走行の記録)・[F-08 の文書](docs/features/f-08-skills/implementation.md#走行の記録) にある。送った JSON には、system prompt・道具の定義・送った時刻を入れた発言が、モデルに渡した形のまま入る
 - **指示の差し替え**: 指示の長さで答えがどう変わるかを試すための指示のファイルが、`tasks/f-02-system-prompt/` にある（`short.md`・`long.md`）。指示を送らないときは `--system-prompt-file /dev/null` を渡す。中身は [F-02 の文書](docs/features/f-02-system-prompt/implementation.md#試すための指示のファイル) にある
 - **道具を試す材料**: ファイルを辿らないと答えられない問いと、長いファイルを分けて読む問いのための小さなプロジェクトが、`tasks/f-03-tool-loop/project/` にある。問いと答えは [F-03 の文書](docs/features/f-03-tool-loop/implementation.md#試すための材料) にある
 - **編集を試す材料**: 通らないテストを持つ小さなプロジェクトが、`tasks/f-04-file-edit/project/` にある。写しを作業ディレクトリにして起動し、通ったかをテストの終了コードで判定する。写し方と判定のコマンドは `tasks/f-04-file-edit/README.md` に、依頼の例は [F-04 の文書](docs/features/f-04-file-edit/implementation.md#試すための材料) にある
 - **コマンドを試す材料**: テストが失敗する小さなプロジェクトと、テストが終わらない小さなプロジェクトが、`tasks/f-05-run-command/` にある。写し方と判定のコマンドは `tasks/f-05-run-command/README.md` に、依頼の例は [F-05 の文書](docs/features/f-05-run-command/implementation.md#試すための材料) にある
 - **許可を試す材料**: 消すのを拒む設定と、秘密のファイルを読むのを拒む設定を置いた小さなプロジェクトと、編集とテストを問わない設定ファイルが、`tasks/f-06-permissions/` にある。写し方と課題は `tasks/f-06-permissions/README.md` にある
 - **slash commands を試す材料**: 通らないテストと、自作のコマンドのファイル3つを持つ小さなプロジェクトが、`tasks/f-07-slash-commands/project/` にある。写し方と課題と判定のコマンドは `tasks/f-07-slash-commands/README.md` にある
+- **スキルを試す材料**: 長さの単位の変換の小さなプロジェクトと、写しのスキルの置き場に写す3つのスキル（変換を足す手順・観点のファイルを持つレビューの手順・版を上げる手順）が、`tasks/f-08-skills/` にある。写し方と課題と判定のコマンドは `tasks/f-08-skills/README.md` にある
 
 ## 開発
 

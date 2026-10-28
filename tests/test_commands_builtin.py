@@ -150,7 +150,7 @@ class HelpTextTest(unittest.TestCase):
         self.assertEqual(lines[1], "  /help     コマンドの一覧を出す")
         self.assertEqual(lines[6], "自作のコマンド（.local-coding-agent/commands/）:")
         self.assertEqual(
-            lines[7:],
+            lines[7:10],
             [
                 "  /explain  説明する",
                 "  Fix.md    （名前に使えない字があるので呼べない）",
@@ -159,7 +159,28 @@ class HelpTextTest(unittest.TestCase):
         )
 
     def test_without_custom(self) -> None:
-        self.assertTrue(help_text(BUILTINS, ()).endswith("/）:\n  （無し）"))
+        self.assertIn("/commands/）:\n  （無し）\n", help_text(BUILTINS, ()))
+
+    def test_lists_skills_after_custom_with_names_aligned_across_all(self) -> None:
+        skills = (
+            Listed("/add-conversion", "変換を足す"),
+            Listed("Foo/", "", "名前に使えない字があるので使えない"),
+        )
+        lines = help_text(BUILTINS, (Listed("/fix", "直す"),), skills).splitlines()
+        self.assertEqual(lines[1], "  /help            コマンドの一覧を出す")
+        self.assertEqual(
+            lines[6:],
+            [
+                "自作のコマンド（.local-coding-agent/commands/）:",
+                "  /fix             直す",
+                "スキル（.local-coding-agent/skills/。/<名前> で呼ぶか、モデルが読み込む）:",
+                "  /add-conversion  変換を足す",
+                "  Foo/             （名前に使えない字があるので使えない）",
+            ],
+        )
+
+    def test_without_skills(self) -> None:
+        self.assertTrue(help_text(BUILTINS, ()).endswith("読み込む）:\n  （無し）"))
 
 
 if __name__ == "__main__":

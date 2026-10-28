@@ -7,7 +7,7 @@
 | モデルの発言の thinking の塊 | その発言の thinking |
 | モデルの発言の tool_use の塊 | その発言の tool_calls の1つ |
 | 利用者の発言の tool_result の塊 | role が tool の発言1つ |
-| 発言のメタデータ（sent_at・command） | content の先頭の文 |
+| 発言のメタデータ（sent_at・command・skill） | content の先頭の文 |
 """
 
 from collections.abc import Sequence

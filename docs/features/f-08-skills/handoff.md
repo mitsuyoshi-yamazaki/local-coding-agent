@@ -1,0 +1,197 @@
+# F-08 引き継ぎ
+
+F-08 を実装したセッション（worktree 側）から、人の問いに答えるセッション（main 側）と、後のセッションへの引き継ぎである。人が読む想定ではない。書き方は `.claude/rules/docs.md` の「handoff.md」。
+
+## 進み具合
+
+- 段: **実装が済んだ**（2026-10-28）。main に取り込み、人が読む・試す段へ進める
+- branch: `f-08-skills`（main の `4fe4670` から作った）
+- commit:
+  - `20e37af`: `spec.md` と、この引き継ぎの始めの版
+  - `8c5cfdb`: コード・テスト・試す材料（`tasks/f-08-skills/`）・README
+  - `8f485e5`: `implementation.md`・`docs/features.md`・`docs/how-coding-agents-work.md` の「スキル（skills）」の節
+  - この引き継ぎの書き直し（この commit）
+- テスト: 404件が通る（main の `4fe4670` の356件に、F-08 で48件を足した。F-07 の `/help` のテスト2つを直した）。Ruff・Ruff の整形・mypy（strict）も通る
+- コードの見直しのエージェント（Claude Code の subagent）に見せ、指摘の一部を直した（下の「見直しで直したこと」）
+- 実物のモデルでは走らせていない（CLAUDE.md の worktree 側）。試すのは main 側で行う
+
+## main 側に頼むこと
+
+- **取り込む**: `git merge f-08-skills`（`/merge-feature f-08-skills`）。main は分岐（`4fe4670`）の後に commit を積んでいないので、早送りになる（2026-10-28 に `git log f-08-skills..main` が空だった）。取り込む前に main が進んでいれば、下の「main と衝突しそうな所」を見る
+- **progress.md**: worktree 側の branch は `f-08-skills` である
+- **人に消してもらうもの**（Claude Code は消さない）: 判定と材料を確かめるために、worktree の `.tmp/` に写しを3つ作った（git には入らない）: `rm -rf .tmp/f08-judge-before .tmp/f08-judge-after .tmp/f08-materials`（worktree の中）
+- **outbox の機能の記録**（`docs/outbox/F-08-…md`）: 実装の要点・設計の選択・読む順の案内（案）は、この引き継ぎから写す
+- **Claude Code が実物のモデルで走らせるとき**（CLAUDE.md の main 側）: 材料の写し方は `tasks/f-08-skills/README.md` のとおり（プロジェクトを写し、`mkdir .tmp/<写し>/.local-coding-agent` の後に `skills/` を写す）。`.claude/agent-settings.json` は、同じ `.local-coding-agent/` に `settings.json` として置く。`load_skill` は読む道具なので、`accept-edits`・`ask` でも問わずに通る。依頼のファイルの1行 `/review convert.py` で、利用者がスキルを呼ぶ道も試せる
+- **上流に上げてよいこと**: 下の「worktree の運用で分かったこと」（WebFetch の結果が大きい・Grep と Glob の道具が無い・`$` を含むコマンドが止まる）
+
+## 仕様を決めるときに人と話したこと
+
+- 持ち主の始めの指示: 「F-08を実装せよ」
+- Claude Code は、仕様の案（置き場・名前と説明だけを指示に入れる・本文は選んだときに読む・付いているファイルはモデルが読む・ファイルの形は F-07 の自作のコマンドと同じ・スキルが無ければ一覧も道具も入れない・起動の行と走行の記録・作らないこと・試す材料）を示し、4つを問うた
+- **読み込み方**: 「専用の道具 `load_skill`（推奨）」を選んだ（「今の `read_file` で読ませる」を選ばなかった）。ハーネスが前付けを除き、`$ARGUMENTS` を入れ、付いているファイルの一覧を添えて返す
+- **置き場**: 「作業ディレクトリだけ（推奨）」を選んだ（`.local-coding-agent/skills/<名前>/SKILL.md`）。`.claude/skills/`・`.agents/skills/` は読まない
+- **利用者が `/<名前>` で呼ぶ**: 「`/名前` でも呼べる」を選んだ（「モデルが選ぶだけ（推奨）」を選ばなかった）。組み込み → 自作のコマンド → スキルの順に探す。中身を利用者の発言として送り、`<metadata>` に「スキル: /<名前> <引数>」を入れる
+- **一覧の置き場**: 「system prompt の節（推奨）」を選んだ（「`load_skill` の道具の説明の中」を選ばなかった）
+- 案のほかの部分（名前はディレクトリの名前・前付けは `description` だけ・`disable-model-invocation` などは作らない・付いているファイルは 50 まで並べる・`enum` で名前を限る、など）は、問わずに案のまま進めた
+- `/名前` でも呼べるようにしたので、Claude Code の `disable-model-invocation`（利用者だけが呼ぶ）にあたるものが欲しくなりうる。作らず、「利用者だけが呼ぶ手順は、F-07 の自作のコマンドに書く」と `spec.md` に書いた（持ち主には問うていない）
+- 機能のディレクトリの名前と branch の名前は `f-08-skills` にした
+- `spec.md` は、問いの答えを入れて Claude Code が書き、持ち主に改めて見せずに実装へ進んだ（F-04〜F-07 と同じ）。持ち主が `spec.md` を読んで異論があれば、main 側で受ける
+
+## 実装の全体像
+
+### ファイル
+
+| ファイル | 役目 | 主な名前 |
+|---|---|---|
+| `local_coding_agent/skills/catalog.py` | 起動のときに置き場を探す・`SKILL.md` を読む・名前で探す・「# スキル」の節・起動の行・走行の記録の1件・`/help` の一覧 | `discover_skills`・`read_skill`・`find_skill`・`skills_section`・`describe_skills`・`skills_record`・`list_skills`・`Skill`・`Unusable`・`SkillCatalog`・`SkillError`・`SKILLS_PATH`・`SKILL_FILE`・`GUIDE` |
+| `local_coding_agent/skills/content.py` | スキルの中身（本文に引数を入れ、付いているファイルを添える）。モデルの道と利用者の道で同じ | `skill_text`・`attached_files`・`MAX_FILES` |
+| `local_coding_agent/tools/load_skill.py` | 道具 `load_skill`（一覧から作る。`name` の `enum`） | `load_skill_tool`・`definition`・`TOOL_NAME` |
+| `local_coding_agent/tools/input_check.py` | `enum` を照らす | `_property_problem` |
+| `local_coding_agent/loop/session.py` | `Session.skills`（起動のときの一覧） | |
+| `local_coding_agent/cli/repl.py` | `/<名前>` でスキルを呼ぶ。`_send` の `command`・`skill` をキーワードにした | `handle_line`・`_send_skill`・`_send`・`CommandKind`（`skill` を足した） |
+| `local_coding_agent/commands/builtin.py` | `/help` にスキルを並べる | `_help`・`help_text(…, skills)`・`_listed_rows` |
+| `local_coding_agent/commands/custom.py` | `_reason` を `error_reason` にした（スキルでも使う）だけ | |
+| `local_coding_agent/model/messages.py` | 利用者の発言のメタデータに、スキルの行 | `Message.skill`・`user_text(…, skill=None)`・`SKILL_LABEL` |
+| `local_coding_agent/loop/turn.py` | 依頼にスキルの行を付けて受ける | `run_turn(…, skill=None)` |
+| `local_coding_agent/context/system_prompt.py` | 「# スキル」の節をつなぐ・既定の指示の2項 | `build_system_prompt(…, skills_section="")`・`DEFAULT_INSTRUCTIONS` |
+| `local_coding_agent/__main__.py` | 起動のときにスキルを探し、道具・規則・節・起動の行・走行の記録に渡す | `main`・`_start_trace` |
+| `local_coding_agent/model/ollama_messages.py` | 変換の表の docstring だけ（`sent_at・command・skill`） | |
+| `tasks/f-08-skills/` | 試す材料（`project/`・`skills/`・README・`judge.py`） | |
+| `tests/test_skills_catalog.py` | 探す（名前の順・使えない理由・ディレクトリでないもの・シンボリックリンク・置き場が読めない）・節・起動の行・記録・`/help` の一覧 | `SkillsTestCase`・`skill`（ほかのテストも使う） |
+| `tests/test_skills_content.py` | 中身（前付け・引数・末尾の `ARGUMENTS:`・付いているファイル・読むたびに読む・誤り）・付いているファイル（並び・`.` で始まるもの・50 を超えたとき・ほかのスキル） | |
+| `tests/test_load_skill.py` | 定義の `enum`・種類と `target`・許可（モード・名前だけの規則・型を持つ規則は合わない）・結果・誤り | |
+| `tests/test_repl_skills.py` | REPL の中（偽物のモデル）: `/<名前>` の送る形と記録・付いているファイルの行数・自作のコマンドと組み込みが勝つ・起動の後に空になった・起動の後に足した・`/help`・モデルが `load_skill` を呼んだ回の履歴 | |
+| `tests/test_main.py` | 起動: 道具と節がスキルのあるときだけ入る・`--system-prompt-file` でも節が残る・記録の2件目・スキルが無くても `load_skill` の規則を読める。`StartTestCase` に共通の準備を分けた | |
+| `tests/fakes.py`・`test_commands_builtin.py`・`test_context.py`・`test_messages.py`・`test_tools.py` | `fake_session(…, skills=)`・`/help` のスキルの節・既定の指示・`<metadata>` のスキルの行・`enum` | |
+
+依存の向き: `skills/catalog.py` → `commands/custom.py`（`parse_custom`・`error_reason`・`Listed`・`COMMANDS_PATH`）・`commands/parse.py`（`NAME`）。`skills/content.py` → `skills/catalog.py`・`commands/custom.py`（`expand`）。`tools/load_skill.py` → `skills/`。`loop/session.py` → `skills/catalog.py`（`SkillCatalog`）。`cli/repl.py` → `skills/`。`commands/builtin.py` → `skills/catalog.py`（`list_skills`・`SKILLS_PATH`）。`skills/` は `tools/`・`loop/`・`cli/` を知らない。循環は無い。
+
+### データの流れ
+
+起動:
+
+1. `main` が `discover_skills(cwd)` → `SkillCatalog`（使える `Skill` と使えない `Unusable`。名前の順）
+2. `load_skill_tool(catalog)` で道具を作る。許可の設定ファイルは `(*DEFAULT_TOOLS, skill_tool)` で読む（スキルが無くても `load_skill` の規則を誤りにしない）
+3. `build_system_prompt(instructions, environment_section(...), skills_section(catalog))`
+4. `_start_trace`: 記録の1件目（許可）・2件目（`skills`）を書き、起動の行（`走行の記録`・`指示`・`許可`・`スキル`・`コマンド`）を出す
+5. `Session(tools=(*DEFAULT_TOOLS, skill_tool) if catalog.skills else DEFAULT_TOOLS, skills=catalog)`
+
+モデルが読み込む:
+
+1. モデルが `load_skill {"name": "review", "arguments": "convert.py"}` を呼ぶ
+2. `loop/tool_call.py` の `execute`（F-03・F-06 のまま）: `input_problem`（`enum` を含む）→ `decide`（読む道具・`target` 無し → モードで通す。`quiet` なので `[許可]` の行は出ない）→ `tool.run`
+3. `run` が `find_skill` → `skill_text(cwd, skill, arguments.strip())`: `read_skill`（読むたびに読む）→ 本文が空なら誤り → `expand`（F-07）→ 空なら誤り → `attached_files` → 本文と一覧
+4. 結果は `tool_result` として履歴に入る（後の回でも送られる）
+
+利用者が呼ぶ:
+
+1. `handle_line`: `parse_command` → `find_builtin` → `find_custom` → `find_skill(session.skills, name)` → `_send_skill`
+2. `_send_skill`: `skill_text(cwd, skill, command.arguments)`（誤りなら `誤り: /<名前> のスキルを使えない: <理由>`・記録 `kind: skill`・`turn: null`）→ `[スキル] …` → 記録（`turn`・`source`・`text`）→ `_send(conversation, text, skill=command.line)`
+3. `run_turn(…, skill=…)` → `user_text(text, sent_at, skill=…)` → 送る直前に `metadata_text` が `スキル: /review convert.py` の行を入れる
+
+## 設計の選択と理由・捨てた案
+
+- **一覧は起動のときに1度だけ探す**: system prompt を起動のときに1度だけ組み立てる（F-02）ので、一覧も同じ時に決まる。`/<名前>` と `/help` も同じ一覧（`Session.skills`）を使い、モデルと利用者で見えるスキルを揃えた。捨てた案: `/<名前>` だけは呼ぶたびに探す（F-07 の自作のコマンドと同じ）。モデルに見えないスキルを利用者だけが呼べるずれが出る
+- **本文は読むたびに読む**: F-07 の自作のコマンドと同じ。起動の後の書き換えが効く
+- **`SKILL.md` を F-07 の読み手で読む**: 形が同じ（前付けの `description`・本文・`$ARGUMENTS`）なので、`parse_custom` と `expand` を使い回した。Claude Code でも自作のコマンドは skills にまとめられている。`read_skill` は `CustomCommand` を返す（名前・パス・説明・本文の4つで、スキルにもそのまま当たる）
+- **名前はディレクトリの名前で、前付けの `name` は読まない**: 名前の形（`NAME`）をディレクトリの名前に当てるだけで、置き場の外を指せないことが保てる。Claude Code も `name` を省けばディレクトリの名前になる
+- **中身を作る関数を1つにした**（`skill_text`）: モデルの道と利用者の道で、送る文を同じにした（Claude Code の文書は、呼んだスキルの本文が「1つの発言として会話に入る」と書く）
+- **付いているファイルのパスを作業ディレクトリからにした**: モデルがそのまま `read_file` に渡せる。スキルのディレクトリからの相対パスだと、モデルがつなぐ手間と誤りが増える（手元のモデルは小さい）
+- **付いているファイルの中身は読まない**: 3段目（要るときに読む）を、モデルの判断に任せるため。読むのは既存の `read_file` で、許可の判定もそのまま効く
+- **`load_skill` は `target` を持たない**: 照らす文字列を持たない道具として、名前だけの規則（`deny` の `load_skill`）だけが合う。スキルの名前を型で照らす規則（`load_skill(review)`）は、`permissions/policy.py` の `_call` に道具の種類を足すことになるので作らなかった。型を持つ規則は、誤りにもならず、黙って合わない（F-06 の「`target` を持たない道具」の扱いのまま）
+- **スキルが無くても `load_skill` の規則を読む**: `.claude/agent-settings.json` のように、いくつもの写しで使い回す設定ファイルに `load_skill` を書いても、スキルの無い写しで起動が止まらないように
+- **読み込み方の指示を「# スキル」の節に書いた**（既定の指示ではなく）: スキルが無いときに入らず、`--system-prompt-file` でも残る。既定の指示には「ハーネスが入れる情報」の2項だけを足した
+- **`/help` の自作のコマンドと同じ名前かを、`/help` のときにファイルで見る**: `find_custom` と同じ `is_file()` の基準。捨てた案: `list_custom` の結果のラベルから名前を取り出す（ラベルの形に頼る）
+- **`Message.skill` を `command` と並べた**: 捨てた案: `command` と `skill` を1つの「どこから来たか」の値にまとめる（F-07 の `command` の扱いを書き換えることになる）。見直しで「どちらか片方」と分かりにくいと指摘され、`_send` の docstring に書き、`run_turn` にはキーワードで渡すようにした
+
+### 見直しで直したこと
+
+コードの見直しのエージェント（Claude Code の subagent。読むだけ）の指摘のうち、次を直した。
+
+- **付いているファイルに `.DS_Store` などが入り、50 の枠を埋めうる**: スキルのディレクトリからのパスで、`.` で始まる部分を持つものを除いた（`_hidden`）。置き場の `.local-coding-agent` は、スキルのディレクトリより上なので見ない（テストを足した）
+- **`run_turn` に `command` と `skill` を位置で渡していた**: キーワードで渡し、`_send` の docstring に「どちらか片方」と書いた
+- **テスト**: シンボリックリンクのディレクトリを辿ること・`.` で始まるファイルを除くこと、を足した
+
+直さなかった指摘:
+
+- **スキルのディレクトリがシンボリックリンクなら、作業ディレクトリの外の `SKILL.md` を読み、中身をモデルに渡す**: F-07 の自作のコマンドのファイルと同じく、置き場は利用者が書くものとして確かめない。`implementation.md` に書いた。モデルが `run_command` で置き場にリンクを作れば、次の起動で一覧に入り、外のファイルの中身がモデルに渡る（読むのはハーネス）
+- **大きなディレクトリ（`node_modules` など）をスキルに置くと、読み込むたびに全てを辿る**: スキルのディレクトリは小さいものとした
+- **`main` の長さ**: 45 行で、50 行の内に収まっている
+
+## 実装前の仕様との違い
+
+`implementation.md` の「実装前の仕様との違い」の表のとおり。仕様に無かった細部（`arguments` の前後の空白を除く・付いているファイルを見られないとき・`.` で始まるファイルを除く・自作のコマンドと同じ名前の見方・`error_reason`・`Session.skills`）だけで、振る舞いの大筋（置き場・3段・道具・中身の形・`/<名前>`・`/help`・起動の行・記録の欄・既定の指示）は仕様のとおりである。
+
+## テストで確かめたこと・確かめていないこと
+
+- 確かめた（F-08 で足した・直したもの）: 上の「ファイル」の表のテストのとおり
+- Claude Code が手元で確かめた（モデルは使っていない）:
+  - `tasks/f-08-skills/` を写した写しで、起動の行・「# スキル」の節・`/help` の一覧・`review` の中身を、`describe_skills`・`skills_section`・`help_text`・`skill_text` に掛けた。節は 290 字、3つの本文（付いているファイルの一覧を含む）は合わせて 771 字だった
+  - `judge.py` は、写したばかりの写しで「テストが全て通る」だけが通って終了コード 1、手で変換・テストの場合・変更の記録を足した写しで4つとも通って終了コード 0 だった
+- 確かめていない:
+  - 実物のモデルが、依頼に合うときに `load_skill` を呼ぶか・合わないときに呼ばないか・`checklist.md` を読みに行くか・`/review` の後に読み込み直さないか
+  - 実物の端末での `/help` の表示（日本語の説明は列の揃えの外）
+  - `main()` から `/review` を打つまでの通し（`repl.run` はテストで偽物の入力を渡した）
+  - Ollama が `enum` をモデルにどう見せるか（道具の定義の JSON はそのまま送るが、モデルの雛形での描き方は確かめていない）
+
+## 人が問いそうなことと答え
+
+- **スキルと自作のコマンド（F-07）は何が違うか**: ファイルの形は同じである。違いは誰が呼ぶかで、自作のコマンドは利用者だけが呼ぶ。スキルは、モデルが説明を見て自分で読み込む（利用者も `/<名前>` で呼べる）。そのため、スキルの名前と説明は毎回の要求に入り、自作のコマンドは何も入らない
+- **一覧はどれくらい文脈を使うか**: 材料の3つで、「# スキル」の節は 290 字。トークン数は、スキルを写した写しと写さない写しの、1つ目の要求の入力トークン数の差で見る（`tasks/f-08-skills/README.md` の「一覧の大きさ」）
+- **モデルが合わないスキルを読み込んだら**: 止めない。本文が道具の結果として履歴に入るだけである。どのスキルを読み込むかはモデルが決め、ハーネスは依頼と照らさない
+- **同じスキルを2度読み込んだら**: もう一度読み、もう一度履歴に足す（2つ入る）。避ける仕組みは作っていない。利用者が `/<名前>` で呼んだ後は、既定の指示で「読み込み直さない」と伝える
+- **`/clear` の後は**: 読み込んだ中身は履歴と一緒に消える。一覧は system prompt にあるので残り、モデルはまた読み込める
+- **スキルの中のスクリプトを走らせるには**: 本文に「`.local-coding-agent/skills/<名前>/scripts/x.py` を走らせよ」と書けば、モデルが `run_command` で走らせる。許可は `run_command` の規則とモードのとおり。Claude Code の `allowed-tools` のような、スキルの間だけ通す仕組みは無い
+- **Claude Code のスキルは使えるか**: `.claude/skills/<名前>/` を `.local-coding-agent/skills/` に写せば、本文・`description`・`$ARGUMENTS`・付いているファイルは効く。`name`（ディレクトリの名前が使われる）・`disable-model-invocation`・`allowed-tools`・`context: fork`・`${CLAUDE_SKILL_DIR}`・`` !`コマンド` `` は効かない（字のまま送られるか、読まれない）
+- **一覧に入らないスキルがある**: `/help` に理由が出る（名前の形・`SKILL.md` が無い・読めない・本文が空）。起動の後に足したものは、起動し直すと入る
+
+## 分かっている問題・残したこと
+
+- **一覧の大きさに上限が無い**: スキルが多いと、毎回の要求が大きくなる。Claude Code の予算（文脈窓の 1%）と説明の切り詰めは作っていない
+- **シンボリックリンク**: 上の「直さなかった指摘」
+- **同じスキルを2度読み込む**: 上の「人が問いそうなこと」
+- **要約（F-12）でスキルの中身が消えうる**: Agent Skills の案内は、要約で読み込んだ中身を残すことを勧めている。F-12 で考える
+- **`load_skill` の型を持つ規則は、黙って合わない**: 誤りにすると親切だが、`permissions/rules.py` の `parse_rule` に道具ごとの扱いを足すことになる
+- **`/help` の列**: 名前が長いスキル（`/add-conversion` の 15 字）があると、組み込みの行も全てその幅になる
+- **`tasks/f-02-system-prompt/short.md`**: 既定の指示とさらに離れた（F-08 で「ハーネスが入れる情報」に2項を足した）
+- F-07 から引き継いだもの: 置き場のシンボリックリンク・`/help` の列・`$` の印（`$ARGUMENTS` のほかの `$…` は字のまま）
+
+## main と衝突しそうな所
+
+main は分岐の後に commit を積んでいない（2026-10-28）。main で F-07 の確認の間に直しが入れば、次の所が F-08 と重なる。
+
+- `local_coding_agent/cli/repl.py`: F-08 は `handle_line` の後半（自作のコマンドの後にスキルを探す）・`_send_skill`・`_send`（キーワードの `command`・`skill`）・`CommandKind`・docstring を直した
+- `local_coding_agent/commands/builtin.py`: `_help` と `help_text`（スキルの節）・`_listed_rows`
+- `local_coding_agent/commands/custom.py`: `_reason` → `error_reason` の3か所
+- `local_coding_agent/model/messages.py`・`loop/turn.py`（`skill` の欄と引数）・`context/system_prompt.py`（既定の指示の「ハーネスが入れる情報」の2項と `build_system_prompt`）・`loop/session.py`・`__main__.py`（`main` の後半と `_start_trace`）
+- `tests/test_commands_builtin.py`（`HelpTextTest`）・`tests/test_main.py`（`StartTestCase` に分けた）・`tests/fakes.py`
+- `README.md`（「できること」の表・画面の例・道具の項・「skills」の項・走行の記録の項・材料の項）・`docs/features.md` の表・`docs/how-coding-agents-work.md`（「スキル」の節・分担の表）
+- main が F-07 の `guide.md` を直すときに、`/help` の画面の例を書いていれば、F-08 の後はスキルの節（`（無し）`）が増える。F-07 の guide.md の注釈（skill `merge-feature` の 6.）が要るかもしれない
+
+## worktree の運用で分かったこと
+
+- **WebFetch の結果が大きい**: `https://code.claude.com/docs/en/skills` は 117,904 字で、1回目と2回目は始めの 100,000 字だけが答えに使われた。続きを `offset` で読むと、要約されずに本文がそのまま返った（約 18,000 字。リポジトリの外には保存されなかった）
+- **Grep・Glob の道具が、このセッションにも無かった**（F-05〜F-07 と同じ）。探すのは `git grep` と Read で行った。`git grep` は git に入っていないファイルを探さない（新しいファイルは Read で確かめた）
+- **`$` を含むコマンドは deny で止まる**（progress.md の申し送りのとおり）。`echo "exit=$?"` が止まったので、`&& echo … || echo …` にした
+- **整形は `ruff format <ファイル>` で行った**: 新しく書いたファイルと、F-08 で触ったファイルだけに掛けた。Python 3.14 の Ruff は、`except (A, B):` を括弧の無い `except A, B:` に書き換える（PEP 758）
+- **見直しのエージェントは読むだけで指摘を出した**（`python` などは走らせないよう頼んだ）
+- `.venv/` は、前のセッションが作ったものがそのまま使えた（`pyproject.toml` は F-07 から変わっていない）。`poetry install` は走らせていない
+- branch を `git switch -c f-08-skills main` で作ると、作業ツリーが main の中身（F-07 の branch より新しい CLAUDE.md など）に替わった。Claude Code は、読んだ後に変わったファイルを読み直すよう求めた
+
+## 読む順の案内（案）
+
+呼ばれる側を挙げるときは、それを呼ぶ入口を一緒に挙げる（F-01 からの申し送り）。
+
+1. `local_coding_agent/__main__.py` の `main`（起動の入口）: スキルを探し、道具・規則・節・起動の行・走行の記録に渡す所。F-08 の起動の流れの全体
+2. `local_coding_agent/skills/catalog.py`（`main` の `discover_skills`・`skills_section`・`describe_skills`・`skills_record`）: 置き場を探す・使えない理由・「# スキル」の節。1段目（一覧）
+3. `local_coding_agent/tools/load_skill.py`（`main` の `load_skill_tool`。モデルが呼ぶと `loop/tool_call.py` の `execute` が `tool.run` を呼ぶ）: 道具の定義の `enum` と、2段目（本文）の入口
+4. `local_coding_agent/skills/content.py`（`load_skill` の `run` と、`repl.py` の `_send_skill` の `skill_text`）: 本文に引数を入れ、付いているファイルを添える所。3段目（付いているファイル）は一覧を添えるだけ
+5. `local_coding_agent/cli/repl.py` の `handle_line` と `_send_skill`（`__main__.py` の `repl.run` から）→ `loop/turn.py` の `run_turn(…, skill=…)` → `model/messages.py` の `metadata_text`: 利用者が `/<名前>` で呼ぶ道
+6. `local_coding_agent/commands/builtin.py` の `_help`・`help_text`（`/help`）と、`catalog.py` の `list_skills`
+7. `local_coding_agent/context/system_prompt.py`: 既定の指示の2項と `build_system_prompt`。`tools/input_check.py` の `enum`
+8. テスト: `tests/test_repl_skills.py`（振る舞いを掴む）→ `test_skills_catalog.py` → `test_skills_content.py` → `test_load_skill.py` → `test_main.py` の `SkillsAtStartTest`
+9. `tasks/f-08-skills/`（README → `skills/` の3つ → `judge.py`）と、試した後の走行の記録（`skills` の件・`request` の system prompt の「# スキル」の節・`load_skill` の `tool` の件）
+
+## 問いと答えの記録
+
+main 側のセッションが、人から来た問いと答え・直したことを足す。

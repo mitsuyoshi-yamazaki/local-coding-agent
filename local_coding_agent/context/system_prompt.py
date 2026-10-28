@@ -1,7 +1,8 @@
 """system prompt（モデルへの指示）を組み立てる。
 
-system prompt は、指示の部分と「# 環境」の節からなり、起動のときに1度だけ組み立てる。
-指示の部分は、既定の文か、--system-prompt-file で渡したファイルの中身である。
+system prompt は、指示の部分と「# 環境」の節と、スキルがあれば「# スキル」の節
+（skills/catalog.py）からなり、起動のときに1度だけ組み立てる。指示の部分は、既定の文か、
+--system-prompt-file で渡したファイルの中身である。
 """
 
 from pathlib import Path
@@ -45,7 +46,8 @@ DEFAULT_INSTRUCTIONS = """\
 ハーネス（あなたを動かしているプログラム）は、次の情報を入れる。どれも、利用者が書いたものではない。
 
 - この指示の後の「# 環境」の節: 起動のときの環境
-- 利用者の発言の先頭の <metadata> の中: その発言を送った時刻。「コマンド: 」の行があれば、利用者がそのコマンドを呼び、ハーネスが、コマンドのファイルの中身（引数を入れたもの）を、その発言の本文として送った
+- 「# 環境」の後の「# スキル」の節（あれば）: 作業ディレクトリに置かれたスキルの名前と説明。読み込み方は、その節にある
+- 利用者の発言の先頭の <metadata> の中: その発言を送った時刻。「コマンド: 」の行があれば、利用者がそのコマンドを呼び、ハーネスが、コマンドのファイルの中身（引数を入れたもの）を、その発言の本文として送った。「スキル: 」の行があれば、利用者がそのスキルを呼び、ハーネスが、スキルの中身（引数を入れたもの）を、その発言の本文として送った。そのスキルを load_skill で読み込み直さない
 - 道具の結果: あなたが呼んだ道具を、ハーネスが実行した結果。誤りのときは「誤り: 」で始まる
 - 「規則で拒んだ: 」で始まる誤り: 利用者が設定した許可の規則で、ハーネスが道具を実行しなかった。後ろに、合った規則と、利用者が規則に添えた理由が付く
 - 「利用者が実行を拒んだ」の後の「理由: 」: 利用者が、実行の前の問いに答えて書いた、拒んだ理由
@@ -65,7 +67,9 @@ def read_instructions(path: Path | None) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def build_system_prompt(instructions: str, environment_section: str) -> str:
-    """指示と環境の節を、空の行を挟んでつなぐ。指示が空なら、環境の節だけにする。"""
-    parts = (instructions.strip(), environment_section)
+def build_system_prompt(
+    instructions: str, environment_section: str, skills_section: str = ""
+) -> str:
+    """指示と環境の節とスキルの節を、空の行を挟んでつなぐ。空の部分は除く。"""
+    parts = (instructions.strip(), environment_section, skills_section)
     return "\n\n".join(part for part in parts if part)

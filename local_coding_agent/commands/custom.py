@@ -63,7 +63,7 @@ def find_custom(cwd: Path, name: str) -> CustomCommand | None:
     try:
         text = (cwd / path).read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError) as error:
-        raise CommandError(_reason(error)) from None
+        raise CommandError(error_reason(error)) from None
     return parse_custom(name, path, text)
 
 
@@ -120,7 +120,7 @@ def list_custom(cwd: Path, builtin_names: Sequence[str]) -> tuple[Listed, ...]:
             if path.suffix == ".md" and path.is_file()
         )
     except OSError as error:
-        return (Listed(f"{COMMANDS_PATH}/", "", f"読めない: {_reason(error)}"),)
+        return (Listed(f"{COMMANDS_PATH}/", "", f"読めない: {error_reason(error)}"),)
     return tuple(_listed(cwd, path.stem, builtin_names) for path in paths)
 
 
@@ -137,7 +137,7 @@ def _listed(cwd: Path, name: str, builtin_names: Sequence[str]) -> Listed:
     return Listed(f"/{name}", description)
 
 
-def _reason(error: OSError | UnicodeDecodeError) -> str:
+def error_reason(error: OSError | UnicodeDecodeError) -> str:
     """読めない理由の文。OSError の文は手元の絶対パスを含むので、理由だけにする。"""
     if isinstance(error, OSError) and error.strerror:
         return error.strerror

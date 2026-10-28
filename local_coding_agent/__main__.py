@@ -24,12 +24,21 @@ from local_coding_agent.model.ollama import OllamaChat
 from local_coding_agent.permissions.policy import MODES
 from local_coding_agent.permissions.settings import (
     SETTINGS_PATH,
+    LoadedPermissions,
     SettingsError,
     describe,
     load_permissions,
     trace_record,
 )
+from local_coding_agent.skills.catalog import (
+    SkillCatalog,
+    describe_skills,
+    discover_skills,
+    skills_record,
+    skills_section,
+)
 from local_coding_agent.tools.default import DEFAULT_TOOLS
+from local_coding_agent.tools.load_skill import load_skill_tool
 from local_coding_agent.trace.writer import TraceWriter, trace_path
 
 DEFAULT_HOST = "http://localhost:11434"
@@ -84,29 +93,26 @@ def main(argv: Sequence[str] | None = None) -> int:
         message = f"作業ディレクトリにできない（{args.directory}）: ディレクトリが無い"
         sys.stderr.write(message + "\n")
         return 2
+    skills = discover_skills(cwd)
+    skill_tool = load_skill_tool(skills)
     try:
         home = Path.home()
-        loaded = load_permissions(cwd, DEFAULT_TOOLS, home, args.permission_mode)
+        # load_skill の規則は、使えるスキルが無くても誤りにしない
+        known = (*DEFAULT_TOOLS, skill_tool)
+        loaded = load_permissions(cwd, known, home, args.permission_mode)
     except (SettingsError, RuntimeError) as error:
         # RuntimeError は、家のディレクトリが分からないとき（Path.home）
         sys.stderr.write(f"設定ファイルを読めない（{SETTINGS_PATH}）: {error}\n")
         return 2
     environment = collect_environment(cwd)
-    system = build_system_prompt(instructions, environment_section(environment))
-    # 表示する行が短くなるよう、渡されたままのパスを基にする
-    traces = (
-        TRACE_DIRECTORY if args.directory is None else args.directory / TRACE_DIRECTORY
+    system = build_system_prompt(
+        instructions, environment_section(environment), skills_section(skills)
     )
-    trace = TraceWriter(trace_path(traces, datetime.now()))
-    trace.write(trace_record(loaded))
-    sys.stdout.write(f"走行の記録: {trace.path}\n")
-    sys.stdout.write(f"指示: {args.system_prompt_file or '既定'}\n")
-    sys.stdout.write(describe(loaded) + "\n")
-    sys.stdout.write("コマンド: /help で一覧\n")
+    trace = _start_trace(args, loaded, skills)
     session = Session(
         model=OllamaChat(host=args.host, model=args.model),
         system=system,
-        tools=DEFAULT_TOOLS,
+        tools=(*DEFAULT_TOOLS, skill_tool) if skills.skills else DEFAULT_TOOLS,
         cwd=cwd,
         read_line=input,
         output=sys.stdout,
@@ -115,9 +121,29 @@ def main(argv: Sequence[str] | None = None) -> int:
         now=local_now,
         permissions=loaded.permissions,
         show_thinking=args.show_thinking,
+        skills=skills,
     )
     repl.run(session)
     return 0
+
+
+def _start_trace(
+    args: argparse.Namespace, loaded: LoadedPermissions, skills: SkillCatalog
+) -> TraceWriter:
+    """走行の記録を始め、起動のときの2件（許可とスキル）を書き、起動の行を出す。"""
+    # 表示する行が短くなるよう、渡されたままのパスを基にする
+    traces = (
+        TRACE_DIRECTORY if args.directory is None else args.directory / TRACE_DIRECTORY
+    )
+    trace = TraceWriter(trace_path(traces, datetime.now()))
+    trace.write(trace_record(loaded))
+    trace.write(skills_record(skills))
+    sys.stdout.write(f"走行の記録: {trace.path}\n")
+    sys.stdout.write(f"指示: {args.system_prompt_file or '既定'}\n")
+    sys.stdout.write(describe(loaded) + "\n")
+    sys.stdout.write(describe_skills(skills) + "\n")
+    sys.stdout.write("コマンド: /help で一覧\n")
+    return trace
 
 
 def local_now() -> datetime:

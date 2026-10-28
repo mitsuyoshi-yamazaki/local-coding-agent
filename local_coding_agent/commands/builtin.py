@@ -11,6 +11,7 @@ from local_coding_agent.cli.conversation import Conversation
 from local_coding_agent.commands.custom import COMMANDS_PATH, Listed, list_custom
 from local_coding_agent.model.messages import Message, ToolResultBlock
 from local_coding_agent.permissions.policy import MODES, is_mode
+from local_coding_agent.skills.catalog import SKILLS_PATH, list_skills
 
 CLEARED = "（会話を消した。次の依頼から新しい会話になる）"
 
@@ -43,9 +44,11 @@ def run_builtin(
 
 
 def _help(conversation: Conversation, arguments: str) -> tuple[Conversation, str]:
+    session = conversation.session
     names = tuple(builtin.name for builtin in BUILTINS)
-    custom = list_custom(conversation.session.cwd, names)
-    return conversation, help_text(BUILTINS, custom)
+    custom = list_custom(session.cwd, names)
+    skills = list_skills(session.skills, session.cwd, names)
+    return conversation, help_text(BUILTINS, custom, skills)
 
 
 def _clear(conversation: Conversation, arguments: str) -> tuple[Conversation, str]:
@@ -92,18 +95,32 @@ BUILTINS: tuple[Builtin, ...] = (
 )
 
 
-def help_text(builtins: tuple[Builtin, ...], custom: tuple[Listed, ...]) -> str:
-    """/help の一覧。名前の列を揃える。"""
-    labels = (*(f"/{builtin.name}" for builtin in builtins), *(c.label for c in custom))
+def help_text(
+    builtins: tuple[Builtin, ...],
+    custom: tuple[Listed, ...],
+    skills: tuple[Listed, ...] = (),
+) -> str:
+    """/help の一覧。名前の列を、組み込み・自作・スキルの全体で揃える。"""
+    labels = (
+        *(f"/{builtin.name}" for builtin in builtins),
+        *(listed.label for listed in (*custom, *skills)),
+    )
     width = max(len(label) for label in labels)
     lines = (
         "組み込みのコマンド:",
         *(_row(f"/{b.name}", b.description, width) for b in builtins),
         f"自作のコマンド（{COMMANDS_PATH}/）:",
-        *(_row(c.label, _with_problem(c), width) for c in custom),
-        *(("  （無し）",) if not custom else ()),
+        *_listed_rows(custom, width),
+        f"スキル（{SKILLS_PATH}/。/<名前> で呼ぶか、モデルが読み込む）:",
+        *_listed_rows(skills, width),
     )
     return "\n".join(lines)
+
+
+def _listed_rows(listed: tuple[Listed, ...], width: int) -> tuple[str, ...]:
+    if not listed:
+        return ("  （無し）",)
+    return tuple(_row(item.label, _with_problem(item), width) for item in listed)
 
 
 def _row(label: str, description: str, width: int) -> str:

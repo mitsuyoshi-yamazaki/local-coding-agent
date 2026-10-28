@@ -152,6 +152,14 @@ class InputCheckTest(unittest.TestCase):
                 self.assertIsNotNone(problem)
                 self.assertIn(message, str(problem))
 
+    def test_enum(self) -> None:
+        schema = {"properties": {"name": {"type": "string", "enum": ["a", "b"]}}}
+        self.assertIsNone(input_problem(schema, {"name": "b"}))
+        self.assertEqual(
+            input_problem(schema, {"name": "c"}),
+            'name は次のどれか: a, b（受けた値: "c"）',
+        )
+
     def test_maximum(self) -> None:
         schema = run_command.DEFINITION.input_schema
         self.assertIsNone(input_problem(schema, {"command": "x", "timeout": 600}))
