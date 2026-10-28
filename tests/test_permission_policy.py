@@ -1,13 +1,16 @@
 import tempfile
 import unittest
 from collections.abc import Sequence
+from dataclasses import replace
 from pathlib import Path
 
 from local_coding_agent.permissions.policy import (
+    DENIED_NOTE,
     Decision,
     Mode,
     Permissions,
     decide,
+    denial,
 )
 from local_coding_agent.permissions.rules import Rule, parse_rule
 from local_coding_agent.tools import edit_file, list_directory, read_file, run_command
@@ -146,6 +149,39 @@ class RuleOrderTest(PolicyTestCase):
         permissions = self.permissions("ask", allow=["run_command"])
         decision = self.command(permissions, "echo $(date) && rm x")
         self.assertEqual(decision.verdict, "allow")
+
+    def test_decision_carries_the_reason_of_the_rule(self) -> None:
+        (rule,) = self.permissions(deny=["run_command(rm *)"]).deny
+        permissions = Permissions(deny=(replace(rule, reason="ファイルを消さない"),))
+        self.assertEqual(
+            self.command(permissions, "rm x"),
+            Decision(
+                "deny",
+                "規則 deny: run_command(rm *)",
+                "run_command(rm *)",
+                "ファイルを消さない",
+            ),
+        )
+
+
+class DenialTest(unittest.TestCase):
+    def test_reason_and_star_are_explained(self) -> None:
+        decision = Decision(
+            "deny", "規則 deny: run_command(rm *)", "run_command(rm *)", "消さない"
+        )
+        self.assertEqual(
+            denial(decision),
+            "規則で拒んだ: run_command(rm *)（規則の * は任意の文字列を表す）。"
+            f"理由: 消さない。{DENIED_NOTE}",
+        )
+
+    def test_without_reason(self) -> None:
+        decision = Decision(
+            "deny", "規則 deny: read_file(secret.txt)", "read_file(secret.txt)"
+        )
+        self.assertEqual(
+            denial(decision), f"規則で拒んだ: read_file(secret.txt)。{DENIED_NOTE}"
+        )
 
 
 class FileRuleTest(PolicyTestCase):

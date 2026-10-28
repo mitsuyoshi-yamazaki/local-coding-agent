@@ -4,8 +4,8 @@
 
 | 材料 | 中身 | 設定 |
 |---|---|---|
-| `delete/` | `build/` にログが2つある | `allow-all`。`deny` に `run_command(rm *)`・`run_command(rmdir *)`・`run_command(unlink *)` |
-| `secret/` | `secret.txt` に合言葉がある | `allow-all`。`deny` に `read_file(secret.txt)` |
+| `delete/` | `build/` にログが2つある | `allow-all`。`deny` に `run_command(rm *)`・`run_command(rmdir *)`・`run_command(unlink *)`。どれも理由（消さない。要るなら利用者に頼む）を添えた |
+| `secret/` | `secret.txt` に合言葉がある | `allow-all`。`deny` に `read_file(secret.txt)`。理由（秘密である。読まず、答えにも書かない）を添えた |
 | `accept-edits.json` | 設定ファイルだけ。F-05 の `duration` の写しに置く | `accept-edits`。`allow` に `run_command(python3 -m unittest*)` |
 
 ## 写して起動する

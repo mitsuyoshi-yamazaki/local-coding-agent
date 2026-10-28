@@ -2,9 +2,18 @@
   "permissions": {
     "mode": "allow-all",
     "deny": [
-      "run_command(rm *)",
-      "run_command(rmdir *)",
-      "run_command(unlink *)"
+      {
+        "rule": "run_command(rm *)",
+        "reason": "ファイルとディレクトリを消さない。消すのが要るなら、利用者に頼む"
+      },
+      {
+        "rule": "run_command(rmdir *)",
+        "reason": "ファイルとディレクトリを消さない。消すのが要るなら、利用者に頼む"
+      },
+      {
+        "rule": "run_command(unlink *)",
+        "reason": "ファイルとディレクトリを消さない。消すのが要るなら、利用者に頼む"
+      }
     ]
   }
 }

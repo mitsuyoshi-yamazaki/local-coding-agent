@@ -68,6 +68,26 @@ class LoadPermissionsTest(unittest.TestCase):
         self.assertEqual(permissions.mode, "ask")
         self.assertEqual(len(permissions.deny), 1)
 
+    def test_rule_with_reason(self) -> None:
+        self.write(
+            {
+                "permissions": {
+                    "deny": [
+                        {"rule": "run_command(rm *)", "reason": "ファイルを消さない"},
+                        "run_command(rmdir *)",
+                    ]
+                }
+            }
+        )
+        deny = self.load().permissions.deny
+        self.assertEqual(
+            [(str(rule), rule.reason) for rule in deny],
+            [
+                ("run_command(rm *)", "ファイルを消さない"),
+                ("run_command(rmdir *)", None),
+            ],
+        )
+
     def test_mode_argument_without_file(self) -> None:
         self.assertEqual(self.load("ask"), LoadedPermissions(Permissions("ask"), None))
 
@@ -82,8 +102,24 @@ class LoadPermissionsTest(unittest.TestCase):
                 {"permissions": {"mode": "default"}},
                 'permissions.mode は ask・accept-edits・allow-all のどれか（受けた値: "default"）',
             ),
-            ({"permissions": {"deny": "rm"}}, "permissions.deny は文字列の並び"),
-            ({"permissions": {"allow": [1]}}, "permissions.allow は文字列の並び"),
+            ({"permissions": {"deny": "rm"}}, "permissions.deny は、規則の文字列か"),
+            ({"permissions": {"allow": [1]}}, "permissions.allow は、規則の文字列か"),
+            (
+                {"permissions": {"deny": [{"reason": "x"}]}},
+                "permissions.deny の規則に、rule（規則の文字列）が無い",
+            ),
+            (
+                {"permissions": {"deny": [{"rule": "run_command", "why": "x"}]}},
+                "permissions.deny の規則 に知らない欄がある: why",
+            ),
+            (
+                {"permissions": {"deny": [{"rule": "run_command", "reason": ""}]}},
+                "permissions.deny の規則の reason は、空でない文字列",
+            ),
+            (
+                {"permissions": {"deny": [{"rule": "Bash(rm *)", "reason": "x"}]}},
+                "permissions.deny: 知らない道具の名前: Bash",
+            ),
             (
                 {"permissions": {"deny": ["Bash(rm *)"]}},
                 "permissions.deny: 知らない道具の名前: Bash",
@@ -126,6 +162,20 @@ class DescribeTest(unittest.TestCase):
                 "deny": [],
             },
         )
+
+    def test_record_keeps_reasons(self) -> None:
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        cwd = Path(directory.name).resolve()
+        path = cwd / SETTINGS_PATH
+        path.parent.mkdir()
+        deny = [
+            {"rule": "run_command(rm *)", "reason": "消さない"},
+            "run_command(mv *)",
+        ]
+        path.write_text(json.dumps({"permissions": {"deny": deny}}), encoding="utf-8")
+        record = trace_record(load_permissions(cwd, DEFAULT_TOOLS, cwd))
+        self.assertEqual(record["deny"], deny)
 
 
 if __name__ == "__main__":

@@ -343,6 +343,7 @@ class OutputAndTraceTest(unittest.TestCase):
                     "decision": "allow",
                     "reason": "モード ask",
                     "rule": None,
+                    "rule_reason": None,
                 },
             },
         )

@@ -13,10 +13,10 @@ from local_coding_agent.loop.session import Session
 from local_coding_agent.model.messages import ToolResultBlock, ToolUseBlock
 from local_coding_agent.permissions.confirm import REFUSED, confirm
 from local_coding_agent.permissions.policy import (
-    DENIED,
     VERDICT_WORDS,
     Decision,
     decide,
+    denial,
 )
 from local_coding_agent.tools.input_check import input_problem
 from local_coding_agent.tools.tool import Tool, ToolError, find_tool
@@ -96,7 +96,7 @@ def execute(session: Session, use: ToolUseBlock) -> ToolRun:
     decision = decide(session.permissions, tool, use.input, session.cwd)
     if decision.verdict == "deny":
         _show_decision(session, decision)
-        return ToolRun(_error(use, f"{DENIED}: {decision.rule}"), permission=decision)
+        return ToolRun(_error(use, denial(decision)), permission=decision)
     try:
         preview = tool.preview(use.input, session.cwd) if tool.preview else None
     except ToolError as error:
@@ -117,7 +117,8 @@ def execute(session: Session, use: ToolUseBlock) -> ToolRun:
 
 def _show_decision(session: Session, decision: Decision) -> None:
     words = VERDICT_WORDS[decision.verdict]
-    session.output.write(f"[許可] {words}: {decision.reason}\n")
+    reason = f"（理由: {decision.rule_reason}）" if decision.rule_reason else ""
+    session.output.write(f"[許可] {words}: {decision.reason}{reason}\n")
 
 
 def _run(
@@ -187,6 +188,7 @@ def _permission_record(decision: Decision | None) -> dict[str, object] | None:
         "decision": decision.verdict,
         "reason": decision.reason,
         "rule": decision.rule,
+        "rule_reason": decision.rule_reason,
     }
 
 

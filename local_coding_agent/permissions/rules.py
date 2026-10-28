@@ -34,6 +34,8 @@ class Rule:
     pattern: str | None
     # 利用者が書いたままの規則。表示と走行の記録に使う
     text: str
+    # 利用者が規則に添えた理由。規則で拒んだときに、モデルに伝える。無ければ None
+    reason: str | None = None
 
     def __str__(self) -> str:
         return self.text

@@ -27,6 +27,11 @@ DEFAULT_MODE: Mode = "allow-all"
 VERDICT_WORDS: dict[Verdict, str] = {"allow": "通す", "ask": "問う", "deny": "拒む"}
 # 規則で拒んだときに、モデルに返す結果の始まり
 DENIED = "規則で拒んだ"
+# 規則で拒んだときに、モデルに返す結果の終わり。拒んだ意図と、次にすることを伝える
+DENIED_NOTE = (
+    "利用者がこの操作を禁じている。同じ目的を、別のコマンドや道具で果たそうとしない。"
+    "要るなら、利用者に尋ねる"
+)
 
 
 def is_mode(value: object) -> TypeIs[Mode]:
@@ -52,6 +57,8 @@ class Decision:
     reason: str
     # 合った規則。モードで決めたなら None
     rule: str | None = None
+    # 合った規則（deny か ask）に、利用者が添えた理由。無ければ None
+    rule_reason: str | None = None
 
 
 @dataclass(frozen=True)
@@ -79,12 +86,24 @@ def decide(
     for verdict, rules in lists:
         hit = next((rule for rule in rules if _hits_any(rule, call)), None)
         if hit is not None:
-            return Decision(verdict, f"規則 {verdict}: {hit}", str(hit))
+            return Decision(verdict, f"規則 {verdict}: {hit}", str(hit), hit.reason)
     allowed = _allowed_by(permissions.allow, call)
     if allowed:
         names = "・".join(str(rule) for rule in allowed)
         return Decision("allow", f"規則 allow: {names}", names)
     return _by_mode(permissions.mode, tool, call.inside)
+
+
+def denial(decision: Decision) -> str:
+    """規則で拒んだときに、モデルに返す結果の文。
+
+    合った規則・規則の * の意味（シェルのワイルドカードと読まれないため）・利用者が添えた
+    理由・拒んだ意図と次にすることを、この順に並べる。
+    """
+    rule = decision.rule or ""
+    star = "（規則の * は任意の文字列を表す）" if "*" in rule else ""
+    reason = f"理由: {decision.rule_reason}。" if decision.rule_reason else ""
+    return f"{DENIED}: {rule}{star}。{reason}{DENIED_NOTE}"
 
 
 def _call(tool: Tool, arguments: ToolInput, cwd: Path) -> _Call:

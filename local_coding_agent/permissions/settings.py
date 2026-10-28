@@ -4,6 +4,8 @@
 SettingsError を投げ、起動しない。形は次のとおりで、どの欄も省ける。
 
     {"permissions": {"mode": "ask", "allow": [...], "ask": [...], "deny": [...]}}
+
+規則の並びの要素は、規則の文字列か、理由を添えた {"rule": "<規則>", "reason": "<理由>"}。
 """
 
 import json
@@ -23,6 +25,7 @@ from local_coding_agent.tools.tool import Tool
 SETTINGS_PATH = Path(".local-coding-agent") / "settings.json"
 LISTS = ("allow", "ask", "deny")
 _SECTION_KEYS = ("mode", *LISTS)
+_RULE_KEYS = ("rule", "reason")
 
 
 class SettingsError(Exception):
@@ -64,10 +67,17 @@ def trace_record(loaded: LoadedPermissions) -> dict[str, object]:
         "type": "permissions",
         "mode": permissions.mode,
         "source": None if loaded.source is None else str(loaded.source),
-        "allow": [str(rule) for rule in permissions.allow],
-        "ask": [str(rule) for rule in permissions.ask],
-        "deny": [str(rule) for rule in permissions.deny],
+        "allow": [_rule_record(rule) for rule in permissions.allow],
+        "ask": [_rule_record(rule) for rule in permissions.ask],
+        "deny": [_rule_record(rule) for rule in permissions.deny],
     }
+
+
+def _rule_record(rule: Rule) -> object:
+    """記録の規則1つ。設定ファイルに書いたのと同じ形にする。"""
+    if rule.reason is None:
+        return str(rule)
+    return {"rule": str(rule), "reason": rule.reason}
 
 
 def _read_json(path: Path) -> object | None:
@@ -117,10 +127,43 @@ def _object(value: object, name: str, keys: Sequence[str]) -> Mapping[str, objec
 def _rules(
     value: object, name: str, tools: Sequence[Tool], cwd: Path, home: Path
 ) -> tuple[Rule, ...]:
-    """規則の並び。文字列の並びでなければ、または規則の書き方が違えば SettingsError。"""
-    if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
-        raise SettingsError(f"permissions.{name} は文字列の並びでなければならない")
+    """規則の並び。形が違えば、または規則の書き方が違えば SettingsError。"""
+    if not isinstance(value, list):
+        raise SettingsError(_shape_message(name))
+    return tuple(_rule(item, name, tools, cwd, home) for item in value)
+
+
+def _rule(
+    item: object, name: str, tools: Sequence[Tool], cwd: Path, home: Path
+) -> Rule:
+    text, reason = _rule_parts(item, name)
     try:
-        return tuple(parse_rule(text, tools, cwd, home) for text in value)
+        rule = parse_rule(text, tools, cwd, home)
     except RuleError as error:
         raise SettingsError(f"permissions.{name}: {error}") from None
+    return replace(rule, reason=reason)
+
+
+def _rule_parts(item: object, name: str) -> tuple[str, str | None]:
+    """並びの要素から、規則の文字列と理由を取り出す。"""
+    if isinstance(item, str):
+        return item, None
+    if not isinstance(item, dict):
+        raise SettingsError(_shape_message(name))
+    fields = _object(item, f"permissions.{name} の規則", _RULE_KEYS)
+    text, reason = fields.get("rule"), fields.get("reason")
+    if not isinstance(text, str):
+        raise SettingsError(f"permissions.{name} の規則に、rule（規則の文字列）が無い")
+    if not isinstance(reason, str) or not reason:
+        message = (
+            f"permissions.{name} の規則の reason は、空でない文字列でなければならない"
+        )
+        raise SettingsError(message)
+    return text, reason
+
+
+def _shape_message(name: str) -> str:
+    return (
+        f"permissions.{name} は、規則の文字列か "
+        '{"rule": <規則>, "reason": <理由>} の並びでなければならない'
+    )

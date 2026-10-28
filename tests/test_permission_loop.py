@@ -4,13 +4,14 @@ import io
 import tempfile
 import unittest
 from collections.abc import Mapping, Sequence
+from dataclasses import replace
 from pathlib import Path
 
 from local_coding_agent.loop.turn import run_turn
 from local_coding_agent.model.chat import Done, ToolCall
 from local_coding_agent.model.messages import ToolResultBlock
 from local_coding_agent.permissions.confirm import PROMPT
-from local_coding_agent.permissions.policy import Mode, Permissions
+from local_coding_agent.permissions.policy import DENIED_NOTE, Mode, Permissions
 from local_coding_agent.permissions.rules import Rule, parse_rule
 from local_coding_agent.tools.default import DEFAULT_TOOLS
 from tests.fakes import RecordingTrace, ScriptedLines, ScriptedModel, fake_session
@@ -32,12 +33,17 @@ class PermissionInLoopTest(unittest.TestCase):
         lines: Sequence[str] = (),
         allow: Sequence[str] = (),
         deny: Sequence[str] = (),
+        reasons: Mapping[str, str] | None = None,
     ) -> None:
-        """道具を1つ呼んで終わる回を、モードと規則を変えて走らせる。"""
+        """道具を1つ呼んで終わる回を、モードと規則を変えて走らせる。
+
+        reasons は、規則の文字列から、その規則の理由への対応。
+        """
 
         def rules(texts: Sequence[str]) -> tuple[Rule, ...]:
+            parsed = (parse_rule(t, DEFAULT_TOOLS, self.cwd, self.cwd) for t in texts)
             return tuple(
-                parse_rule(t, DEFAULT_TOOLS, self.cwd, self.cwd) for t in texts
+                replace(rule, reason=(reasons or {}).get(str(rule))) for rule in parsed
             )
 
         permissions = Permissions(mode, rules(allow), (), rules(deny))
@@ -65,17 +71,13 @@ class PermissionInLoopTest(unittest.TestCase):
     def test_denied_call_is_not_run_previewed_or_asked(self) -> None:
         call = ToolCall("c", "write_file", {"path": "a.txt", "content": "b\n"})
         self.run_call(call, "ask", deny=["write_file(a.txt)"])
-        self.assertEqual(
-            self.result(),
-            ToolResultBlock("c", "規則で拒んだ: write_file(a.txt)", is_error=True),
-        )
+        denied = f"規則で拒んだ: write_file(a.txt)。{DENIED_NOTE}"
+        self.assertEqual(self.result(), ToolResultBlock("c", denied, is_error=True))
         self.assertEqual((self.cwd / "a.txt").read_text(encoding="utf-8"), "a\n")
         self.assertEqual(self.read_line.prompts, [])
         output = self.output.getvalue()
         self.assertIn(
-            "[許可] 拒む: 規則 deny: write_file(a.txt)\n"
-            "→ 誤り: 規則で拒んだ: write_file(a.txt)\n",
-            output,
+            f"[許可] 拒む: 規則 deny: write_file(a.txt)\n→ 誤り: {denied}\n", output
         )
         self.assertNotIn("---", output)
         self.assertEqual(
@@ -84,8 +86,25 @@ class PermissionInLoopTest(unittest.TestCase):
                 "decision": "deny",
                 "reason": "規則 deny: write_file(a.txt)",
                 "rule": "write_file(a.txt)",
+                "rule_reason": None,
             },
         )
+
+    def test_reason_of_the_rule_reaches_model_and_screen(self) -> None:
+        call = ToolCall("c", "run_command", {"command": "rm a.txt"})
+        reasons = {"run_command(rm *)": "ファイルを消さない"}
+        self.run_call(call, deny=["run_command(rm *)"], reasons=reasons)
+        result = self.result()
+        assert isinstance(result, ToolResultBlock)
+        self.assertIn("。理由: ファイルを消さない。", result.content)
+        self.assertTrue((self.cwd / "a.txt").exists())
+        self.assertIn(
+            "[許可] 拒む: 規則 deny: run_command(rm *)（理由: ファイルを消さない）\n",
+            self.output.getvalue(),
+        )
+        permission = self.record()["permission"]
+        assert isinstance(permission, dict)
+        self.assertEqual(permission["rule_reason"], "ファイルを消さない")
 
     def test_allowed_by_rule_runs_without_asking_and_shows_preview(self) -> None:
         call = ToolCall("c", "run_command", {"command": "echo 走った"})
@@ -107,7 +126,12 @@ class PermissionInLoopTest(unittest.TestCase):
         self.assertIs(record["confirmed"], True)
         self.assertEqual(
             record["permission"],
-            {"decision": "ask", "reason": "モード ask", "rule": None},
+            {
+                "decision": "ask",
+                "reason": "モード ask",
+                "rule": None,
+                "rule_reason": None,
+            },
         )
 
     def test_refused_after_asking(self) -> None:
