@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import TextIO
 
 from local_coding_agent.model.chat import ChatModel
+from local_coding_agent.permissions.policy import Permissions
 from local_coding_agent.tools.tool import Tool
 from local_coding_agent.trace.writer import TraceSink
 
@@ -30,5 +31,7 @@ class Session:
     clock: Callable[[], float]
     # 発言に付ける、今の時刻（時差つき）
     now: Callable[[], datetime]
+    # 道具の呼び出しを、通す・問う・拒むのどれにするかを決める、モードと規則
+    permissions: Permissions
     # 推論の文を表示するか（--show-thinking）。表示しなくても、走行の記録には残す
     show_thinking: bool = False

@@ -46,7 +46,7 @@ DEFINITION = ToolDefinition(
         "old_string がファイルの中の1か所だけに合うよう、前後の行を含める。"
         "合う所を全て置き換えるときは replace_all に true を渡す。"
         "そのままでは見つからないときは、行末の空白と字下げのずれを除いて探す。"
-        "新しいファイルは write_file で作る。実行の前に、利用者が差分を見て確かめる。"
+        "新しいファイルは write_file で作る。"
     ),
     input_schema={
         "type": "object",

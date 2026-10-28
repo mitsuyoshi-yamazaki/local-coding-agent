@@ -174,7 +174,9 @@ class CommandInLoopTest(ToolTestCase):
     def test_shows_command_then_runs_when_allowed(self) -> None:
         result, output = self.run_turn("y")
         self.assertIn(
-            "$ echo 走った > ran.txt; echo 失敗; exit 1\n→ 終了コード: 1・2 行\n",
+            "$ echo 走った > ran.txt; echo 失敗; exit 1\n"
+            "[許可] 問う: モード ask\n"
+            "→ 終了コード: 1・2 行\n",
             output,
         )
         self.assertEqual(

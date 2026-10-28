@@ -147,14 +147,14 @@ class ToolErrorTest(unittest.TestCase):
 
 class ConfirmInLoopTest(unittest.TestCase):
     def test_changing_tool_runs_when_allowed(self) -> None:
-        tool = fake_tool("write", echo, changes=True)
+        tool = fake_tool("write", echo, kind="edit")
         run = Run([[call("write", "c"), STOP], [STOP]], (tool,), ("y",))
         self.assertEqual(run.read_line.prompts, [PROMPT])
         self.assertEqual(run.results(2), (ToolResultBlock("c", "echo: "),))
         self.assertIs(run.trace.of_type("tool")[0]["confirmed"], True)
 
     def test_refused_tool_is_not_run_and_loop_continues(self) -> None:
-        tool = fake_tool("write", interrupted, changes=True)
+        tool = fake_tool("write", interrupted, kind="edit")
         run = Run(
             [[call("write", "c"), STOP], [TextDelta("分かった"), STOP]], (tool,), ("n",)
         )
@@ -180,20 +180,23 @@ def not_found(arguments: Mapping[str, object], cwd: Path) -> str:
 
 class PreviewInLoopTest(unittest.TestCase):
     def test_preview_is_shown_before_asking(self) -> None:
-        tool = fake_tool("write", echo, changes=True, preview=shown)
+        tool = fake_tool("write", echo, kind="edit", preview=shown)
         run = Run([[call("write", "c"), STOP], [STOP]], (tool,), ("y",))
-        self.assertIn("[道具] write {}\n--- 差分\n→ 1 行\n", run.output.getvalue())
+        self.assertIn(
+            "[道具] write {}\n--- 差分\n[許可] 問う: モード ask\n→ 1 行\n",
+            run.output.getvalue(),
+        )
         self.assertEqual(run.read_line.prompts, [PROMPT])
         self.assertEqual(run.trace.of_type("tool")[0]["preview"], "--- 差分")
 
     def test_refused_records_the_preview(self) -> None:
-        tool = fake_tool("write", interrupted, changes=True, preview=shown)
+        tool = fake_tool("write", interrupted, kind="edit", preview=shown)
         run = Run([[call("write", "c"), STOP], [STOP]], (tool,), ("n",))
         record = run.trace.of_type("tool")[0]
         self.assertEqual((record["confirmed"], record["preview"]), (False, "--- 差分"))
 
     def test_preview_error_is_returned_without_asking(self) -> None:
-        tool = fake_tool("write", interrupted, changes=True, preview=not_found)
+        tool = fake_tool("write", interrupted, kind="edit", preview=not_found)
         run = Run([[call("write", "c"), STOP], [STOP]], (tool,))
         self.assertEqual(run.read_line.prompts, [])
         self.assertEqual(
@@ -277,7 +280,7 @@ class CancelAndErrorTest(unittest.TestCase):
         )
 
     def test_ctrl_c_during_confirm(self) -> None:
-        tool = fake_tool("write", echo, changes=True)
+        tool = fake_tool("write", echo, kind="edit")
         run = Run(
             [[call("write", "c"), STOP], [STOP]],
             (tool,),
@@ -336,6 +339,11 @@ class OutputAndTraceTest(unittest.TestCase):
                 "is_error": False,
                 "seconds": 0.5,
                 "preview": None,
+                "permission": {
+                    "decision": "allow",
+                    "reason": "モード ask",
+                    "rule": None,
+                },
             },
         )
 

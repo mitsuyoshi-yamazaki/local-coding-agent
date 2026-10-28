@@ -9,6 +9,7 @@ import difflib
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+from typing import cast
 
 from local_coding_agent.model.chat import ToolDefinition
 from local_coding_agent.tools.lines import split_lines
@@ -39,12 +40,15 @@ class FileChange:
 def file_tool(
     definition: ToolDefinition, plan: Callable[[ToolInput, Path], FileChange]
 ) -> Tool:
-    """ファイルを書く道具。下見は変更の差分を返し、実行は変更を組み立て直して書く。"""
+    """ファイルを書く道具。下見は変更の差分を返し、実行は変更を組み立て直して書く。
+    許可の規則とは、入力の path を照らす。
+    """
     return Tool(
         definition=definition,
-        changes=True,
+        kind="edit",
         run=lambda arguments, cwd: write(plan(arguments, cwd)),
         preview=lambda arguments, cwd: diff_text(plan(arguments, cwd)),
+        target=lambda arguments: cast(str, arguments["path"]),
     )
 
 

@@ -57,4 +57,9 @@ def _name(entry: Path) -> str:
     return f"{entry.name}/" if entry.is_dir() else entry.name
 
 
-TOOL = Tool(definition=DEFINITION, changes=False, run=run)
+def target(arguments: ToolInput) -> str:
+    """許可の規則と照らすパス。無ければ作業ディレクトリ。"""
+    return cast(str, arguments.get("path", "."))
+
+
+TOOL = Tool(definition=DEFINITION, kind="read", run=run, target=target)

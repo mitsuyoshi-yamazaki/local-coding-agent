@@ -87,4 +87,9 @@ def _rest_notice(total: int, next_line: int) -> list[str]:
     ]
 
 
-TOOL = Tool(definition=DEFINITION, changes=False, run=run)
+def target(arguments: ToolInput) -> str:
+    """許可の規則と照らすパス。"""
+    return cast(str, arguments["path"])
+
+
+TOOL = Tool(definition=DEFINITION, kind="read", run=run, target=target)

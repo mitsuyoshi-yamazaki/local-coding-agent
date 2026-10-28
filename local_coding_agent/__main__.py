@@ -1,5 +1,5 @@
 """起動: python -m local_coding_agent --model <モデルのタグ> [--host <URL>]
-[--system-prompt-file <パス>] [--show-thinking]
+[--system-prompt-file <パス>] [--show-thinking] [--permission-mode <モード>]
 """
 
 import argparse
@@ -20,6 +20,14 @@ from local_coding_agent.context.system_prompt import (
 )
 from local_coding_agent.loop.session import Session
 from local_coding_agent.model.ollama import OllamaChat
+from local_coding_agent.permissions.policy import MODES
+from local_coding_agent.permissions.settings import (
+    SETTINGS_PATH,
+    SettingsError,
+    describe,
+    load_permissions,
+    trace_record,
+)
 from local_coding_agent.tools.default import DEFAULT_TOOLS
 from local_coding_agent.trace.writer import TraceWriter, trace_path
 
@@ -48,6 +56,11 @@ def parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         action="store_true",
         help="推論の文を表示する（付けなくても、走行の記録には残る）",
     )
+    parser.add_argument(
+        "--permission-mode",
+        choices=MODES,
+        help=f"許可のモード。設定ファイル（{SETTINGS_PATH}）のモードを上書きする",
+    )
     return parser.parse_args(argv)
 
 
@@ -60,11 +73,20 @@ def main(argv: Sequence[str] | None = None) -> int:
         sys.stderr.write(f"指示のファイルを読めない（{path}）: {error}\n")
         return 2
     cwd = Path.cwd()
+    try:
+        home = Path.home()
+        loaded = load_permissions(cwd, DEFAULT_TOOLS, home, args.permission_mode)
+    except (SettingsError, RuntimeError) as error:
+        # RuntimeError は、家のディレクトリが分からないとき（Path.home）
+        sys.stderr.write(f"設定ファイルを読めない（{SETTINGS_PATH}）: {error}\n")
+        return 2
     environment = collect_environment(cwd)
     system = build_system_prompt(instructions, environment_section(environment))
     trace = TraceWriter(trace_path(TRACE_DIRECTORY, datetime.now()))
+    trace.write(trace_record(loaded))
     sys.stdout.write(f"走行の記録: {trace.path}\n")
     sys.stdout.write(f"指示: {args.system_prompt_file or '既定'}\n")
+    sys.stdout.write(describe(loaded) + "\n")
     session = Session(
         model=OllamaChat(host=args.host, model=args.model),
         system=system,
@@ -75,6 +97,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         trace=trace,
         clock=time.monotonic,
         now=local_now,
+        permissions=loaded.permissions,
         show_thinking=args.show_thinking,
     )
     repl.run(session)

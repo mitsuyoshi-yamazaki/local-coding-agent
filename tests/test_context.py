@@ -15,6 +15,7 @@ from local_coding_agent.context.system_prompt import (
 )
 from local_coding_agent.loop.turn import CANCELLED_NOTE
 from local_coding_agent.model.ollama_messages import ERROR_PREFIX
+from local_coding_agent.permissions.policy import DENIED
 from local_coding_agent.tools.default import DEFAULT_TOOLS
 
 
@@ -94,6 +95,13 @@ class SystemPromptTest(unittest.TestCase):
         self.assertIn(f"「{ERROR_PREFIX}」で始まる", DEFAULT_INSTRUCTIONS)
         # 回が途中で止まったことの知らせ（loop/turn.py）
         self.assertIn(f"「{CANCELLED_NOTE}」", DEFAULT_INSTRUCTIONS)
+        # 規則で拒んだ結果の始まり（permissions/policy.py）
+        self.assertIn(f"「{DENIED}: 」で始まる誤り", DEFAULT_INSTRUCTIONS)
+
+    def test_default_instructions_tell_not_to_work_around_denials(self) -> None:
+        self.assertIn(
+            "規則で拒まれた操作は、別の道具やコマンドで行わない", DEFAULT_INSTRUCTIONS
+        )
 
     def test_default_instructions_name_the_default_tools(self) -> None:
         for tool in DEFAULT_TOOLS:

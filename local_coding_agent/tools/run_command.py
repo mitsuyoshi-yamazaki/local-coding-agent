@@ -27,7 +27,6 @@ DEFINITION = ToolDefinition(
         "毎回、作業ディレクトリで走る。cd と環境変数は、次のコマンドに残らない。"
         "標準入力は空である。入力を待つコマンドと、終わらないコマンド（サーバなど）は走らせない。"
         f"出力が {MAX_OUTPUT} 字を超えると、間を省く。"
-        "実行の前に、利用者がコマンドを見て確かめる。"
     ),
     input_schema={
         "type": "object",
@@ -103,6 +102,16 @@ def _output(output: str) -> str:
     return clip(text) if text else NO_OUTPUT
 
 
+def target(arguments: ToolInput) -> str:
+    """許可の規則と照らすコマンド。"""
+    return cast(str, arguments["command"])
+
+
 TOOL = Tool(
-    definition=DEFINITION, changes=True, run=run, preview=preview, summary=summary
+    definition=DEFINITION,
+    kind="command",
+    run=run,
+    preview=preview,
+    summary=summary,
+    target=target,
 )
