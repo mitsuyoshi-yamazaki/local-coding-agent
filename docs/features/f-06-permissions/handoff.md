@@ -199,3 +199,13 @@ F-06 は、main の次のファイルを直した。main で F-05 の確認の�
 ## 問いと答えの記録
 
 main 側のセッションが、人から来た問いと答え・直したことを足す。
+
+### main への取り込み（2026-10-28）
+
+- `/merge-feature f-06-permissions` で取り込んだ（`2162214`。基点 `7cf8ac0`）。main は `f8f6394` の後に F-05 の確認の記録（guide.md・handoff.md・measurements.md）と skill `merge-feature`・CLAUDE.md の直しを積んでいたので、早送りにはならなかった
+- 衝突したのは `docs/features.md` の表だけ（上の「main と衝突しそうな所」のとおり）。main が F-05 の行に「計測の結果」と「確かめる案内」へのリンクを足し、branch が F-05 の次に F-06 の行を足した。main の F-05 の行を残し、F-06 の行をその下に足した
+- main は分岐の後にコードを変えていないので、意味の衝突は無い
+- 検査: テスト274件・`ruff check`・`ruff format --check`・mypy が通った
+- main で直したこと: `permissions/confirm.py` の docstring が「問うのは、変更を伴う道具（Tool.changes が True）だけ」のままだった（上の「ファイル」の表では「変えていない」）。F-06 で `changes` は無くなり、問うかは `decide` が決めるので、そう書き直した（`de15540`。振る舞いは変わらない）。ほかに `changes` を指す所はコードとテストに無い（`git grep` で確かめた）
+- 持ち主のメモ `docs/features/f-06-permissions/memo.md` を空で作った
+- F-05 の `guide.md` の「動作の確かめ方」は、F-06 の後のコードでは問いが出ない（既定が `allow-all`）。F-05 の試す材料の README には branch が1行足したが、F-05 の guide.md は直していない。行の番号が F-05 の時点のコードのものなので、直すなら全ての行を確かめ直すことになる。持ち主に問う
