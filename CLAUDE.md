@@ -2,7 +2,7 @@
 
 このリポジトリで作業する Claude Code への指示である。
 
-- 要件は [docs/requirements.md](docs/requirements.md) にあり、下で読み込む。正本は上流のリポジトリ（非公開）にあり、変更は `docs/inbox/` で届く。持ち主がこのリポジトリのセッションで直接出した要件は、先に写しに書き、outbox と SendMessage で上流へ報告する（main 側が行う）
+- 要件は [docs/requirements.md](docs/requirements.md) にあり、下で読み込む。正本は上流のリポジトリ（非公開）にあり、変更は `docs/inbox/` で届く。持ち主がこのリポジトリのセッションで直接出した要件は、先に写しに書き、outbox と SendMessage で上流へ報告する（main 側が行う）。持ち主の指示のうち続けて守るもの（「今後も」など）は、要件として写しに書いて上流へ上げるかを持ち主に問い、答えに従う
 - この文書と Claude Code の設定（`.claude/`）は、要件から skill `derive-settings` で書き起こしたものである。要件と設定の対応と、設定では止められない部分は [docs/claude-code-settings.md](docs/claude-code-settings.md) にある
 - 要件が変わったとき・Claude Code の版が上がったとき・道具を足したときは、`derive-settings` で書き起こし直す（変更は持ち主の承認を得てから）
 - 返答の言語などの、持ち主の全プロジェクトに共通の規則は `~/.claude/rules/` にあり、ここにも効く
@@ -34,13 +34,18 @@
   - inbox・outbox・`docs/progress.md`・outbox の機能の記録を扱う。worktree 側の進み具合は、`.worktrees/next/` の下の handoff.md を読んで `docs/progress.md` に写す
   - `docs/progress.md` を書き直したら、`cp docs/progress.md .worktrees/next/docs/progress.md` と `cp docs/progress.md .worktrees/polish/docs/progress.md` で、worktree 側と polish 側へ写しを置く（写しも `.gitignore` で git に入らない）
   - worktree 側の実装が済んだら、`git merge f-NN-<機能名>` で main に取り込む。`polish` は取り込まない
+  - 作るエージェントを実物のモデルで走らせるのは、人に頼まれたときにする（要件の「動作検証で、実物のモデルで走らせる扱い」。試す段は人が行う）。走らせ方:
+    - 課題を `.tmp/` の下に写し、`.claude/agent-settings.json`（Claude Code が守る運用の要件にあたる許可の規則）を、写しの `.local-coding-agent/settings.json` に置く。課題が自分の設定を持てば、その規則を足した設定を `.tmp/` に作って置く。モードは `accept-edits` か `ask` にし、`allow-all` にしない（`allow-all` が前提の課題は、人が試す）
+    - 依頼を `.tmp/` のファイルに書き、リポジトリの根で `.venv/bin/python -m local_coding_agent --model <モデル> --directory <写し> < <依頼のファイル>` で起動する。問いには答えない（入力の終わりで、問われた呼び出しは全て拒まれる）
+    - 手元の Ollama の API は、推論と読むだけの口（`/api/chat`・`/api/generate`・`/api/version`・`/api/tags`・`/api/ps`・`/api/show`）だけを使う。モデルを取り込む・消す・作る・写す・送る口（`/api/pull`・`/api/delete`・`/api/create`・`/api/copy`・`/api/push`）は使わない
+    - sandbox の中のコマンドは localhost の全てのポートに届くが、手元の Ollama（`localhost:11434`）のほかには繋がない
 - **worktree 側**（`.worktrees/next/`。機能が変わっても同じディレクトリを使う）
   - main で確認中の機能の、次の機能を実装する。仕様（人の承認）→ 実装 → テスト → commit
   - `docs/features/f-NN-<機能名>/handoff.md` を書き、段が進むたびに直す（書き方は `.claude/rules/docs.md`）
   - main で確認中の機能の確認が済んだら、`git merge main` で取り込み、衝突を解き、main の変更と要件に合わせる。要れば実装をやり直す
   - 実装が済んだら、handoff.md の進み具合を「済んだ」にし、人に知らせる（取り込むのは main 側）
   - inbox・outbox は扱わない（git に入っておらず、worktree には無い）。`docs/progress.md` は main 側が置く写しで、読むだけにする（直しても、main 側が次に写すときに上書きされる）。上流とのやりとりは main 側が行う
-  - 実物のモデルで走らせない。試すのは main 側で人が行う
+  - 実物のモデルで走らせない。試すのは main 側で行う
   - 始めに、`poetry install`（人に確かめる）で worktree の `.venv/` を作る。worktree の sandbox の中では `which poetry` が見つからないが、`poetry install` は sandbox の外で走るので動く（F-02 の worktree で実測）
 - **次の機能へ**: main に取り込んだら、人が worktree で新しいセッションを始める。そのセッションは `git switch -c f-NN-<機能名> main` で新しい branch を作る。取り込み済みの古い branch は残す（上の「削除」）
 - **polish 側**（`.worktrees/polish/`・branch `polish`。同じ branch を使い続ける）

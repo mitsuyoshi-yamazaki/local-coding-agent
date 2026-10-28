@@ -107,7 +107,8 @@
     },
     "network": {
       "allowedDomains": [],
-      "deniedDomains": ["*"]
+      "deniedDomains": ["*"],
+      "allowLocalBinding": true
     }
   },
   "hooks": {

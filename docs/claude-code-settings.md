@@ -2,8 +2,9 @@
 
 このリポジトリで開発に使う Claude Code の設定を、[要件](requirements.md) からどう書き起こしたかを示す対応表である。書き起こしの手順は `.claude/skills/derive-settings/SKILL.md` にある。
 
-- Claude Code の版: 2.1.308。sandbox の除外と `.git` への書き込みの拒否は 2.1.310 で確かめた
+- Claude Code の版: 2.1.308。sandbox の除外と `.git` への書き込みの拒否は 2.1.310 で、作るエージェントを実物のモデルで走らせる扱いは 2.1.312 で確かめた
 - 公式の文書を確かめた日: 2026-10-24。sandbox の除外と `.git` への書き込みの拒否は 2026-10-25（[sandboxing](https://code.claude.com/docs/en/sandboxing) の Protected paths・[settings-reference](https://code.claude.com/docs/en/settings-reference) の `sandbox.excludedCommands` と `sandbox.filesystem.denyWrite`・[permission-modes](https://code.claude.com/docs/en/permission-modes) の Protected paths）
+- 2026-10-28 に確かめた: [sandboxing](https://code.claude.com/docs/en/sandboxing)（localhost へのつなぎは `NO_PROXY` で proxy を通らず、macOS では `network.allowLocalBinding` で決まる・その警告）・[settings-reference](https://code.claude.com/docs/en/settings-reference) の `sandbox.network.*` のキー・[permission-modes](https://code.claude.com/docs/en/permission-modes)（auto mode でも deny と ask が効く・分類器が止めるものに、人の承認も sandbox も無いエージェントのループの起動がある）・[hooks](https://code.claude.com/docs/en/hooks) の PreToolUse の入出力。[permissions](https://code.claude.com/docs/en/permissions) は、結果が大きくリポジトリの外に保存されたので読んでいない（規則の順と Bash の規則の照合は、F-06 の仕様で 2026-10-27 に確かめたものを使う）。skills と memory の文書は、この回は変える所が無いので確かめていない
 
 ## 設定の置き場
 
@@ -12,6 +13,7 @@
 | `CLAUDE.md` | 要件の読み込み（`@docs/requirements.md`）と、設定では止められない部分の指示 |
 | `.claude/settings.json` | permissions・sandbox・hook の登録 |
 | `.claude/hooks/guard_paths.py` | リポジトリの外のファイルを編集する道具の呼び出しを拒む hook |
+| `.claude/agent-settings.json` | Claude Code が作るエージェントを実物のモデルで走らせるときに、写しの `.local-coding-agent/settings.json` に置く、作るエージェントの許可の設定 |
 | `.claude/rules/docs.md` | docs/ の書き方（docs/ の文書を読み書きすると読み込まれる） |
 | `.claude/skills/derive-settings/SKILL.md` | 要件から設定を書き起こす手順 |
 | `.claude/skills/feature-record/` | 機能の記録を書く手順と雛形 |
@@ -24,7 +26,7 @@
 | 手段 | 何を縛るか | 限界 |
 |---|---|---|
 | permissions（deny・ask・allow） | 道具の呼び出しを、規則と照合して拒む・人に確かめる・確かめずに通す。照合は deny → ask → allow の順で、どの設定ファイルの deny も allow に勝つ。ask は auto mode でも人に確かめる | Bash の規則はコマンドの文字列で照合する。同じ操作を別の書き方（`/bin/rm`・`sh -c '…'`・Python から呼ぶ、など）にすると一致しない |
-| sandbox | Bash のコマンドとその子のプロセスを、OS（macOS では Seatbelt）で縛る。書き込みは作業ディレクトリと一時ディレクトリだけ。ネットワークは許したドメインだけ | Read・Edit・WebFetch などの道具には効かない。sandbox の外で走らせるコマンド（`excludedCommands`）には効かない。除外は、呼び出しの中の全てのコマンドが除外の型に一致したときだけ効き、`cd`・リダイレクト・コマンドの置き換えを含む呼び出しは sandbox の中に残る。作業ディレクトリの中の `.git` は、`hooks` と `config` だけを既定で守り（公式の文書の Protected paths）、worktree の `.git`（gitdir を指すファイル）は守らない（実測）。削除は縛らない |
+| sandbox | Bash のコマンドとその子のプロセスを、OS（macOS では Seatbelt）で縛る。書き込みは作業ディレクトリと一時ディレクトリだけ。ネットワークは許したドメインだけ（proxy を通るつなぎ）。localhost へは proxy を通らずに直に繋ぎ、macOS では `network.allowLocalBinding` で通すかが決まる | Read・Edit・WebFetch などの道具には効かない。sandbox の外で走らせるコマンド（`excludedCommands`）には効かない。除外は、呼び出しの中の全てのコマンドが除外の型に一致したときだけ効き、`cd`・リダイレクト・コマンドの置き換えを含む呼び出しは sandbox の中に残る。作業ディレクトリの中の `.git` は、`hooks` と `config` だけを既定で守り（公式の文書の Protected paths）、worktree の `.git`（gitdir を指すファイル）は守らない（実測）。削除は縛らない |
 | `blockReadsOutsideWorkingDirectories` | Read・Grep・Glob が作業ディレクトリの外を読むのを拒む。sandbox と併せると、sandbox の中のコマンドもホームディレクトリなどを読めない | 利用者の設定で足した作業ディレクトリと、Claude Code が要る `~/.claude` の一部は読める |
 | hook（PreToolUse） | 道具の呼び出しの前にスクリプトを走らせ、入力を見て拒む | 登録した道具にしか効かない |
 | CLAUDE.md・rule | Claude への指示 | 強制力は無い |
@@ -38,7 +40,7 @@
 |---|---|
 | deny | `rm`・`rmdir`・`unlink`・`mv`・`find … -delete`・`git rm`・`git mv`・`git clean`・`git restore`・`git reset --hard`・`git checkout -- …`・`git checkout .`・`git stash drop`・`git stash clear`・`git branch -d`/`-D`・`git tag -d`・`git worktree remove`・`poetry env remove` |
 | ask | `git checkout`・`git switch`（ファイルを指すと未コミットの変更を捨てるため） |
-| CLAUDE.md | 削除が要るときは、消すものとコマンドを示して人に頼む |
+| CLAUDE.md | 削除が要るときは、消すものとコマンドを示して人に頼む。branch と stash は、取り込み済みでも消さず、人にも消すよう頼まない |
 
 止められない部分: 別の書き方の削除（`/bin/rm`・Python の `os.remove` など）。
 
@@ -99,15 +101,26 @@
 
 止められない部分: WebFetch の URL に載せて送ること。sandbox の外で走る `git` と、除外した `poetry` のコマンドの通信（`git push` は ask）。
 
-手元の Ollama を呼ぶこと: sandbox は全てのドメインを拒むので、今は sandbox の中のコマンドから Ollama に届かない。作ったエージェントを実物のモデルで走らせるときの扱いは、上流で設計の途中である。
+手元の Ollama を呼ぶこと: `allowLocalBinding` で、sandbox の中のコマンドから localhost に届く（下の「作るエージェントを実物のモデルで走らせる」）。proxy を通る外へのつなぎは、`deniedDomains: ["*"]` のまま止まる。
 
-### 実物のモデルで走らせるのは、許可の機能（F-06）ができるまで人だけ
+### 作るエージェントを実物のモデルで走らせる
+
+許可の機能（F-06）ができたので、Claude Code も実物のモデルで走らせてよい。作るエージェントに、Claude Code が守る運用の要件にあたる許可の規則を設定し、手元の Ollama だけに届くようにする。
 
 | 手段 | 設定 |
 |---|---|
-| sandbox | 上の `deniedDomains: ["*"]` で、sandbox の中のコマンド（作ったエージェント・`ollama` のコマンドを含む）は手元の Ollama にも届かない。作ったエージェントとテストは `.venv/bin/python` で起動し、その子のプロセスまで sandbox の中で走る。`poetry run` で起動する形は除外の型に一致しないので、sandbox の外に出ない |
+| sandbox | `network.allowLocalBinding: true`。sandbox は localhost へのつなぎを proxy に通さず（`NO_PROXY`）、macOS では、この設定が無いと直のつなぎを止める（公式の文書。下の「止まるかを確かめた操作」）。作るエージェントは `.venv/bin/python` で起動し、その子のプロセス（`run_command` のコマンド）まで sandbox の中で走る。リポジトリの外の読み書き・proxy を通る外への通信・`.git` への書き込みは、Claude Code のコマンドと同じく OS で止まる。`poetry run` で起動する形は除外の型に一致しないので、sandbox の外に出ない |
+| 作るエージェントの許可（`.claude/agent-settings.json`） | モード `accept-edits`（作業ディレクトリの中の編集は通し、ほかは問う）。`allow` は `run_command(python3 -m unittest*)`。`deny` は、削除（`rm`・`rmdir`・`unlink`・`mv`・`find … -delete`）・`git`・環境変数（`env`・`printenv`・`export`・`set`・`security`・`$` を含むもの）・外への通信（`curl`・`wget`・`ssh`・`scp`・`rsync`・`gh`）・`ollama`・道具の導入（`pip`・`pip3`・`brew`・`poetry`）・作業ディレクトリの設定ファイル（`.local-coding-agent/`）の書き換え・秘匿のファイルの `read_file`（`.env`・`.env.*`・`~/.ssh` など、Claude Code の Read の deny と同じ場所） |
+| 作るエージェントの起動 | 標準入力に依頼のファイルを渡し、問いには答えない。入力の終わりで、問われた呼び出しは全て拒まれる（F-06 の判定）。`--directory <写し>` で、`cd` を使わずに写しを作業ディレクトリにする |
+| CLAUDE.md | 走らせるのは人に頼まれたとき（試す段は人が行う）。走らせ方（写し・設定・標準入力）。課題の設定と合わせるときもモードを `allow-all` にしない。Ollama の API は推論と読むだけの口だけを使う。localhost の Ollama のほかには繋がない。worktree 側と polish 側は走らせない |
 
-止められない部分: 無いと見ている。ただし、手元の Ollama が入っていないので、届かないことは試していない。
+止められない部分:
+
+- **localhost の全てのポート**: `allowLocalBinding` はポートを限れない。sandbox の中の全てのコマンド（Claude Code のコマンドと、作るエージェントが走らせるコマンド）が、localhost で待つ全てのサービスに繋げ、ポートを開いて待つこともできる（公式の文書の警告）。CLAUDE.md の指示だけで守る
+- **Ollama の API の、モデルを取り込む・消す口**: Ollama のサーバは sandbox の外で動くので、`/api/pull` を呼べば、リポジトリの外（`~/.ollama`）に書かれ、外から取り込まれる。Claude Code の deny（`ollama pull` など）と、作るエージェントの deny（`curl`・`ollama`）は、Python から API を呼ぶ形には効かない。CLAUDE.md の指示だけで守る
+- **通したテストのコード**: `python3 -m unittest` を通す規則は、テストのコード（モデルが書き換えられる）が行う全てを通す。sandbox はリポジトリの外を止めるが、リポジトリの中の削除と書き換え（写しの外を含む）は止めない。テストのコードが環境変数を出せば、走行の記録に残り、Claude Code がそれを読みうる
+- **作るエージェントの規則の照合の限界**（F-06 の `implementation.md` の「照合の限界」）: 別の書き方（`/bin/rm`・`python3 -c`）は `deny` に合わない。ただし `accept-edits` で問いに答えないので、`allow` に合わないコマンドは拒まれる
+- **人が見ていないところで走らせるとき**: Claude Code が走らせると、作るエージェントは Claude Code の sandbox の中で走る。課題の繰り返しなどで、それで足りるか（OS のサンドボックスを重ねるか）は、要件のとおり上流が持ち主に問う
 
 ### 環境変数と秘匿情報の読み取りの禁止
 
@@ -122,7 +135,7 @@
 | 手段 | 設定 |
 |---|---|
 | deny | `sh -c`・`bash -c`・`zsh -c`・`eval`・`git -C`・`git -c`・`$` を含むコマンド |
-| ask | `cd`（作業ディレクトリはリポジトリの根なので、要らない） |
+| ask | `cd`（作業ディレクトリはリポジトリの根なので、要らない。作るエージェントは `--directory` で写しを指す） |
 | CLAUDE.md | ファイルを読む・探すのは Read・Grep・Glob で行い、shell で行わない。web を読むのは WebFetch で行う。言い換えて規則を避けない |
 
 止められない部分: 規則に一致しない全ての言い換え。
@@ -146,7 +159,7 @@
 | コードは常に Claude Code が書き、人が読む | 要件（CLAUDE.md が読み込む） |
 | 機能ごとの記録の項目と書き方 | skill `feature-record`（手順と雛形） |
 | 1機能の進め方・inbox と outbox の書式 | 要件（CLAUDE.md が読み込む） |
-| 持ち主が直接出した要件は、写しに先に書き、上流へ報告する | 要件（CLAUDE.md が読み込む）と CLAUDE.md（報告は main 側） |
+| 持ち主が直接出した要件は、写しに先に書き、上流へ報告する。続けて守る指示は、写しに書いて上流へ上げるかを持ち主に問う | 要件（CLAUDE.md が読み込む）と CLAUDE.md（報告は main 側） |
 | commit するもの | CLAUDE.md |
 | README.md にセットアップ・起動・使い方を書き、機能を足すたびに直す | CLAUDE.md |
 | 作業の進行を `docs/progress.md` に記録し、常に更新する（扱うのは main 側だけ） | CLAUDE.md と `.gitignore`（git に入れない）。docs/ の rule は当てない。worktree 側と polish 側のセッションは main 側のファイルを読めないので（下の行）、main 側が書き直すたびに各 worktree へ写しを置き、worktree 側は読むだけにする（CLAUDE.md の指示だけ）。写しも、worktree の `.gitignore` で git に入らない |
@@ -193,7 +206,12 @@
 | `: >> .git/worktrees/next/commondir` | `denyWrite` で止まった |
 | Edit で `.worktrees/next/.git`・`.git/description` | deny で止まった |
 | `git status --short` | 上の拒否を足したあとも、sandbox の外で動いた |
+| Python から `http://localhost:11434/api/version`（`allowLocalBinding` を足す前。2026-10-28） | sandbox で止まった（Operation not permitted） |
+| 同じ（`allowLocalBinding` を足した後） | 届いた（Ollama 0.40.10）。設定の変更は、同じセッションのまま効いた |
+| Python から `https://example.com`（`allowLocalBinding` を足した後） | deny list で止まった（host is on the deny list） |
+| `.claude/agent-settings.json` を写しに置き、作るエージェントの判定（`decide`）に掛けた（モデルは使っていない） | `python3 -m unittest`（`-v 2>&1` 付きも）と作業ディレクトリの中の `read_file`・`write_file` は通した。`python3 -m unittest; rm -rf build`・`find … -delete`・`env`・`echo $HOME`・`git status`・`curl …/api/pull`・`.env` と `~/.ssh` の `read_file`・`.local-coding-agent/settings.json` の `write_file` は拒んだ。`cat README.md` と作業ディレクトリの外の `read_file`・`write_file` は問うた |
+| 作るエージェントを、`--directory` で写しを指し、標準入力に依頼のファイルを渡して、`qwen3.5:9b` で1回走らせた（F-03 の読む材料） | 作業ディレクトリの中の `read_file` は問わずに通り、`run_command` の `ls` は問われて、入力の終わりで拒まれた。auto mode の分類器には止められなかった |
 
-試していないもの: `mv`・`git restore` などの、上で試したものと同じ形の deny。`cd` と `poetry` の ask（上の `poetry` の行は走ったが、確認が出たかは記録していない）。除外した `poetry` のコマンドに、書き換えたリポジトリの中のファイルを読ませて sandbox の外でコードを走らせる形（上の「道具の導入とモデルの取り込み」の止められない部分）。`git --git-dir=…`・`git --exec-path=…` で、書ける場所を指す形（上の「git の remote の操作」の止められない部分）。
+試していないもの: `mv`・`git restore` などの、上で試したものと同じ形の deny。`cd` と `poetry` の ask（上の `poetry` の行は走ったが、確認が出たかは記録していない）。除外した `poetry` のコマンドに、書き換えたリポジトリの中のファイルを読ませて sandbox の外でコードを走らせる形（上の「道具の導入とモデルの取り込み」の止められない部分）。`git --git-dir=…`・`git --exec-path=…` で、書ける場所を指す形（上の「git の remote の操作」の止められない部分）。localhost の Ollama のほかのポートに届くこと（`allowLocalBinding` の警告のとおりと見ている）と、Ollama の API のモデルを取り込む・消す口（試すと、リポジトリの外が変わる）。
 
 許すドメインを空にしただけで外へ出られた原因は、確かめていない。許すドメインは、`allowedDomains` と、どの設定ファイルの `WebFetch(domain:…)` の allow とも合わさる。このリポジトリの allow にある `WebFetch` はドメインを指定しない形で、公式の文書では、この形は sandbox の中のコマンドが届く先を変えない。確かめるには `deniedDomains` を外して試す必要があり、そのあいだ sandbox の中のコマンドが外へ出られるので、行っていない。

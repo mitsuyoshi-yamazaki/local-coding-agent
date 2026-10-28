@@ -56,7 +56,7 @@ CLAUDE.md の「main と worktree の分担」の、main 側の「worktree 側�
 
 ## 4. 検査し、記録する
 
-CLAUDE.md の「Python の環境」の4つ（unittest・`ruff check`・`ruff format --check`・mypy）を走らせる。落ちたら原因を調べ、取り込みで生じたものなら main で直して commit する（`fix: …`）。branch の実装そのものの誤りなら、直す前に人に示す。作るエージェントは、実物のモデルで走らせない（要件の「動作検証で、実物のモデルで走らせる扱い」）。
+CLAUDE.md の「Python の環境」の4つ（unittest・`ruff check`・`ruff format --check`・mypy）を走らせる。落ちたら原因を調べ、取り込みで生じたものなら main で直して commit する（`fix: …`）。branch の実装そのものの誤りなら、直す前に人に示す。取り込みでは、作るエージェントを実物のモデルで走らせない（試すのは人。Claude Code が走らせるのは、人に頼まれたとき。CLAUDE.md の main 側）。
 
 記録する。
 

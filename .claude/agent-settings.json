@@ -1,0 +1,42 @@
+{
+  "permissions": {
+    "mode": "accept-edits",
+    "allow": ["run_command(python3 -m unittest*)"],
+    "deny": [
+      "run_command(rm *)",
+      "run_command(rmdir *)",
+      "run_command(unlink *)",
+      "run_command(mv *)",
+      "run_command(find * -delete*)",
+      "run_command(git *)",
+      "run_command(env)",
+      "run_command(env *)",
+      "run_command(printenv*)",
+      "run_command(export)",
+      "run_command(set)",
+      "run_command(security *)",
+      "run_command(*$*)",
+      "run_command(curl *)",
+      "run_command(wget *)",
+      "run_command(ssh *)",
+      "run_command(scp *)",
+      "run_command(rsync *)",
+      "run_command(gh *)",
+      "run_command(ollama *)",
+      "run_command(pip *)",
+      "run_command(pip3 *)",
+      "run_command(brew *)",
+      "run_command(poetry *)",
+      "write_file(.local-coding-agent/*)",
+      "edit_file(.local-coding-agent/*)",
+      "read_file(/*.env)",
+      "read_file(/*.env.*)",
+      "read_file(~/.ssh/*)",
+      "read_file(~/.aws/*)",
+      "read_file(~/.gnupg/*)",
+      "read_file(~/.netrc)",
+      "read_file(~/.config/gh/*)",
+      "read_file(~/Library/Keychains/*)"
+    ]
+  }
+}
