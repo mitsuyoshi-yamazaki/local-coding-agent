@@ -276,3 +276,11 @@ main 側のセッションが、人から来た問いと答え・直したこと
   - ④誤り（中身が同じなら）。"When Claude re-invokes a skill whose rendered content is identical to the copy already in context, Claude Code adds a short note that the skill is already loaded rather than a second copy"。引数や動的な中身が変われば、全文をもう一度足す
   - ⑤正しい。文書も "Seeing a skill trigger tells you Claude found it, not that it did what you intended" と書く。確実にする道は `/<名前>` と、`disable-model-invocation`（使わせない）と、必ず守る規則を hook に移すこと
 - 直したことは無い
+
+### Claude Code の skill と command の違い（2026-10-29・main 側）
+
+- 問い: 「ClaudeCodeのskillとcommandの違いは、ClaudeCodeが自動で実行するかどうか　のみか」
+- 答え（公式の文書 https://code.claude.com/docs/en/skills を 2026-10-29 に確かめた）: それだけではない。文書は "Custom commands have been merged into skills" "both create `/deploy` and work the same way" と書く。違いは、①形（command は `.claude/commands/` の .md の1ファイル、skill はディレクトリと `SKILL.md`）②付いているファイル（skill だけ。文書は "Prefer a skill for new work, since skills also support supporting files"）③前付け（command は "the same frontmatter except `name` and `paths`"。ファイルに触れたときだけ働く `paths` は skill だけ）④名前（command は下のディレクトリを `:` でつなぐ。例 `/frontend:component`）⑤同じ名前なら skill が勝つ
+- 自動で使うか: 文書の中で食い違う。始めの注は skill が足すものに "the ability for Claude to load them automatically when relevant" を挙げるが、command は `disable-model-invocation` を含む同じ前付けを持ち、"work the same way" とも書く。このセッションでモデルに見える一覧には、`build-fix: Build and Fix`・`learn: /learn - Extract Reusable Patterns` のように、見出しの1行を説明にしたものがある。持ち主の `~/.claude/commands/` のファイルに見えるが、リポジトリの外なので確かめていない。どちらにしても、モデルが使うかは skill か command かより、`disable-model-invocation`・`user-invocable` で決まる
+- このアプリとの違い: このアプリでは、自作のコマンド（F-07）はモデルに一覧を送らず（`docs/request-formats.md` の場面 4）、スキル（F-08）は必ず送る。本文の形は同じ（同じ読み手 `parse_custom`）で、違いはモデルが選べるかと、付いているファイルの一覧と、`load_skill` の道だけである
+- 直したことは無い
