@@ -258,4 +258,21 @@ main 側のセッションが、人から来た問いと答え・直したこと
 
 - 問い（main 側から持ち主へ。Claude Code の動作検証で、手順の4.の `python -m unittest` が規則の `python3 -m unittest*` に合わず、問われて拒まれた）: 材料の `add-conversion/SKILL.md` の `python -m unittest` を、`python3 -m unittest` に替えるか
 - 答え: 「そうせよ」
-- 直したこと: `tasks/f-08-skills/skills/add-conversion/SKILL.md` の手順の4.と、それを例に引く `implementation.md` の「使い方」を `python3 -m unittest` にした。行数は変わらない（`load_skill` の結果の行数・guide.md は変わらない）。`skills/release/SKILL.md` の3.・`project/README.md`・材料の README の判定の表の `python -m unittest` は、問いの範囲の外なので変えていない
+- 直したこと（`6d6e86e`）: `tasks/f-08-skills/skills/add-conversion/SKILL.md` の手順の4.と、それを例に引く `implementation.md` の「使い方」を `python3 -m unittest` にした。行数は変わらない（`load_skill` の結果の行数・guide.md は変わらない）。`skills/release/SKILL.md` の3.・`project/README.md`・材料の README の判定の表の `python -m unittest` は、問いの範囲の外なので変えていない
+
+### スキルの説明・本文がコンテキストをどう使うか（2026-10-29・main 側）
+
+- 問い: 次の5つは正しいか。このアプリと Claude Code のそれぞれについて答えよ。①適切なタイミングで呼ぶために、スキルの説明をモデルに送る必要がある ②スキルの説明は system prompt に入る（スキルを入れるほど system prompt が大きくなり、コンテキストを使う）③利用時にスキルの全文が読み込まれ、以降の履歴に入る ④同じスキルを複数回呼ぶと、全文が呼んだ回数分、履歴に入る ⑤呼ぶかはモデルの判断で、人の想定する条件と違うことは常にありうる
+- 答え（このアプリ。コードで確かめた）:
+  - ①正しい。モデルが選ぶには説明が要る。利用者が `/<名前>` で呼ぶだけのスキルでも、説明は必ず送る（`disable-model-invocation` にあたるものは作っていない。F-08 の仕様）
+  - ②正しい。`skills_section` が「# スキル」の節を system prompt の最後に足し、`main` が道具 `load_skill`（`enum` にスキルの名前）を足す。数・字数の上限は無い。毎回の要求で送り直す。実測は3つで 325 トークン
+  - ③ほぼ正しい。前付けは除き、`$ARGUMENTS` を入れた本文と、付いているファイルのパスの一覧（中身ではない）が入る。`load_skill` なら tool の発言、`/<名前>` なら依頼の発言として、`/clear` まで残り、毎回送り直す。要約（F-12）は無いので、消えない
+  - ④正しい。呼ぶたびに読み直して、同じ文を返す。重ねないための仕組みは無い。既定の指示が止めるのは、`/<名前>` で送ったスキルを読み込み直すことだけ
+  - ⑤正しい（モデルが読み込む道について）。確実に使わせる道は、利用者の `/<名前>` だけ。逆に、モデルに使わせない手段は無い
+- 答え（Claude Code。公式の文書 https://code.claude.com/docs/en/skills を 2026-10-29 に確かめた。置き場はこのセッションで見えた形）:
+  - ①正しい。ただし、一覧の予算（コンテキストの窓の 1%）を超えると、使う回数の少ないスキルから説明を落とし、名前だけにする。`disable-model-invocation: true` のスキルは、一覧に出ない（このセッションで、`merge-feature` は一覧に無かった）
+  - ②前半は誤り、後半はほぼ正しい。文書は置き場を書かず、"loaded into context" とだけ書く。このセッションでは、system prompt ではなく、会話の中の system-reminder に入っていた（Skill の道具の説明も "Available skills appear in a system-reminder listing" と書く）。"Every skill in the skill listing adds to your context on every turn"。ただし、予算があるので、上限なく大きくはならない（名前は全て残る。1つの説明は 1,536 字まで。`skillListingBudgetFraction` などで変えられる）
+  - ③ほぼ正しい。"the rendered SKILL.md content enters the conversation as a single message and stays there across later turns"。付いているファイルは、読んだときだけ入る。例外は `context: fork` で、本文は subagent に渡り、元の会話の履歴には入らない。要約（compaction）の後は、スキルごとに最後に呼んだ1回を、先頭の 5,000 トークンまで付け直す（全部で 25,000 トークンまで）
+  - ④誤り（中身が同じなら）。"When Claude re-invokes a skill whose rendered content is identical to the copy already in context, Claude Code adds a short note that the skill is already loaded rather than a second copy"。引数や動的な中身が変われば、全文をもう一度足す
+  - ⑤正しい。文書も "Seeing a skill trigger tells you Claude found it, not that it did what you intended" と書く。確実にする道は `/<名前>` と、`disable-model-invocation`（使わせない）と、必ず守る規則を hook に移すこと
+- 直したことは無い
