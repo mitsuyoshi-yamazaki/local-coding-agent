@@ -231,3 +231,12 @@ main 側のセッションが、人から来た問いと答え・直したこと
   - `add-conversion` の手順は `python -m unittest` と書くので、Claude Code の走らせ方の規則（`python3 -m unittest*`）では走らない。既定のモード `allow-all` では走る（この機械で `python` が見つかるかは確かめていない）。F-07 の `fix.md` と同じく、F-08 の誤りではない
   - レビューの答えは、2回とも観点の形には沿ったが、中身に誤りを含んだ。判定は持ち主が行う
 - 直したことは無い
+
+### Ollama へ送る情報を組み立てる場所（2026-10-29・main 側）
+
+- 問い: 「ソースコードの、Ollamaへ送信する情報を組み立てている場所を示せ」
+- 答え（F-08 の取り込みの後のコードで確かめた）:
+  - 送る JSON の全体は `model/ollama_messages.py` の `chat_request_body` で作る（`model`・`messages`・`stream: true`、道具があれば `tools`）。`to_ollama_messages`（system prompt を先頭の system の発言にする）・`_assistant`（thinking・tool_calls）・`_user`（結果の塊を tool の発言に）・`_tool_message`・`_content`（`metadata_text` と本文をつなぐ）が会話を変え、`to_ollama_tools` が道具の定義を変える
+  - それを呼ぶのは `model/ollama.py` の `OllamaChat.build_request`（URL を `<host>/api/chat` にする）で、さらにそれを呼ぶのは `loop/model_call.py` の `call_model`（毎歩、`session.system`・道具の定義・会話の全体を渡し、要求の件を走行の記録に書く）。送るのは `OllamaChat.stream`（`json.dumps` して POST）
+  - 材料の出所: system prompt は `__main__.py` の `main` が起動のときに1度だけ `build_system_prompt` で組む（指示・「# 環境」・「# スキル」）。道具は `main` が `Session.tools` に入れる（スキルがあれば `load_skill` を足す）。会話は `loop/turn.py` の `run_turn` が、依頼の発言（メタデータつき）・モデルの発言・結果の発言を足していく
+- 直したことは無い
