@@ -31,6 +31,7 @@
   - 問いに答えるときは、その機能の `docs/features/f-NN-<機能名>/handoff.md` を読む。来た問いと答え・直したことを handoff.md に足す
   - 直したことで、その機能の確かめる案内 `docs/features/f-NN-<機能名>/guide.md`（動作の確かめ方・読む順・既存の実装からの変わり。skill `merge-feature` が書く）の中身が変われば、guide.md も直し、直しと同じ commit に入れる。F-04 までの機能には guide.md が無い
   - 前の機能の guide.md は直さない（直し続けると切りが無いため）。後の変更（機能の取り込み・main の直し）で、そのままでは動かなくなったら、いつ入った変更で動かなくなったかの注釈を足す（書き方は skill `merge-feature` の 6.）
+  - 確認の間の直しで、モデルへ送る要求の形が変われば（欄・枠・文が増えた・変わった・消えた）、`tests/request_formats/` の場面と見どころを直し、`docs/request-formats.md` を生成し直して、直しと同じ commit に入れる（下の「モデルへ送る要求の形」）
   - inbox・outbox・`docs/progress.md`・outbox の機能の記録を扱う。worktree 側の進み具合は、`.worktrees/next/` の下の handoff.md を読んで `docs/progress.md` に写す
   - `docs/progress.md` を書き直したら、`cp docs/progress.md .worktrees/next/docs/progress.md` と `cp docs/progress.md .worktrees/polish/docs/progress.md` で、worktree 側と polish 側へ写しを置く（写しも `.gitignore` で git に入らない）
   - worktree 側の実装が済んだら、`git merge f-NN-<機能名>` で main に取り込む。`polish` は取り込まない
@@ -42,6 +43,7 @@
 - **worktree 側**（`.worktrees/next/`。機能が変わっても同じディレクトリを使う）
   - main で確認中の機能の、次の機能を実装する。仕様（人の承認）→ 実装 → テスト → commit
   - `docs/features/f-NN-<機能名>/handoff.md` を書き、段が進むたびに直す（書き方は `.claude/rules/docs.md`）
+  - 機能が、モデルへ送る要求の形を変えるなら（新しい欄・枠を使う・利用者の操作の情報が要求に入る・入らなくなる）、`tests/request_formats/` に、その機能の場面と見どころを足すか直し、`docs/request-formats.md` を生成し直して、機能の commit に入れる（下の「モデルへ送る要求の形」）。handoff.md の「実装の全体像」に、足した場面を書く
   - main で確認中の機能の確認が済んだら、`git merge main` で取り込み、衝突を解き、main の変更と要件に合わせる。要れば実装をやり直す
   - 実装が済んだら、handoff.md の進み具合を「済んだ」にし、人に知らせる（取り込むのは main 側）
   - inbox・outbox は扱わない（git に入っておらず、worktree には無い）。`docs/progress.md` は main 側が置く写しで、読むだけにする（直しても、main 側が次に写すときに上書きされる）。上流とのやりとりは main 側が行う
@@ -62,6 +64,14 @@
 
 - 仮想環境はリポジトリの中の `.venv/` にある。コードは `.venv/bin/python` で走らせる（`poetry run` は使わない）
 - commit の前に、テストと lint と型の検査を通す: `.venv/bin/python -m unittest`・`.venv/bin/ruff check .`・`.venv/bin/ruff format --check .`・`.venv/bin/mypy`（mypy が検査する場所は `pyproject.toml` にある。コードの置き場を作ったら足す）
+
+## モデルへ送る要求の形
+
+- `docs/request-formats.md` は、`tests/request_formats/` の場面（利用者が打つ行・偽物のモデルの台本・見どころ）を実物のコードに通して生成する文書である。手で直さない
+- 生成し直す: `.venv/bin/python -m tests.request_formats`。`tests/test_request_formats.py` は、文書が今のコードから生成したものと違えば落ちる。落ちたら、差分が意図した変わりかを読んでから生成し直す
+- 見どころが要求と合わなければ（照らした文が無いなど）、生成は誤りで止まる。コードの変わりに合わせて、見どころを直す
+- 新しい欄・枠・利用者の操作は、場面か見どころを足さないと一覧に出ない。テストは足し忘れを止めないので、送る形を変えた側（worktree 側の機能・main 側の直し）が足す
+- 取り込み（`git merge`）で `docs/request-formats.md` が衝突したら、手で解かない。`tests/request_formats/` の衝突を解いた後に、生成し直す
 
 ## 記録
 
