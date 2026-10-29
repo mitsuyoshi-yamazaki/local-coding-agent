@@ -252,3 +252,10 @@ main 側のセッションが、人から来た問いと答え・直したこと
 - 作りの要点: 差し替えるのは、モデルの応答（台本）・利用者の入力（`builtins.input`）・時刻（`local_now`）・環境（`collect_environment`）・家のディレクトリ（`Path.home`）・画面だけ。要求は実物の `OllamaChat.build_request` で作り、`stream` で `json.dumps` してから読み戻した本文を集める。一時ディレクトリのパスが要求に入れば止める。見どころは「情報・伝わり方（Ollama の欄・ハーネスの枠・ハーネスの値・そのままの文・送らない）・場所・照らした文・作る所」で、生成のときに照らし、合わなければ止める。作る所の行の番号は `inspect` で取り、文書の最後の「作る所」の節にだけ置く（行が動いただけの差分を、場面の節に出さないため）
 - 一覧で分かったこと（コードは変えていない）: 止めた回と誤りで止まった回の知らせは、内部では結果の発言の末尾の本文の塊だが、Ollama の形では tool の発言の後の、別の user の発言になり、次の依頼と user の発言が2つ並ぶ。`--system-prompt-file` では、既定の指示の「# ハーネスが入れる情報」の説明が無くなるので、`<metadata>` などの枠の説明もモデルに届かない
 - 持ち主に問うこと: 「今後実装される機能については…」「main 側で…更新するようにせよ」は続けて守る指示なので、要件として写しに書いて上流へ上げるか
+- 持ち主の答え: 「上流へ送る必要はない」。要件として写しに書かず、上流に上げない（このリポジトリの細部として、CLAUDE.md と skill `merge-feature` にだけ書いた）
+
+### 材料の add-conversion のテストのコマンド（2026-10-29・main 側）
+
+- 問い（main 側から持ち主へ。Claude Code の動作検証で、手順の4.の `python -m unittest` が規則の `python3 -m unittest*` に合わず、問われて拒まれた）: 材料の `add-conversion/SKILL.md` の `python -m unittest` を、`python3 -m unittest` に替えるか
+- 答え: 「そうせよ」
+- 直したこと: `tasks/f-08-skills/skills/add-conversion/SKILL.md` の手順の4.と、それを例に引く `implementation.md` の「使い方」を `python3 -m unittest` にした。行数は変わらない（`load_skill` の結果の行数・guide.md は変わらない）。`skills/release/SKILL.md` の3.・`project/README.md`・材料の README の判定の表の `python -m unittest` は、問いの範囲の外なので変えていない

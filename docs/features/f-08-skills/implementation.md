@@ -16,7 +16,7 @@ description: 長さの単位の変換を足す手順（引数: 足す変換。�
 1. convert.py の RATES に行を足す
 2. test_convert.py の CASES に2行を足す
 3. CHANGELOG.md の「## 未リリース」の見出しの下に行を足す
-4. `python -m unittest` を走らせる
+4. `python3 -m unittest` を走らせる
 
 足す変換: $ARGUMENTS
 ```
