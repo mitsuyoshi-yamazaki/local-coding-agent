@@ -284,3 +284,15 @@ main 側のセッションが、人から来た問いと答え・直したこと
 - 自動で使うか: 文書の中で食い違う。始めの注は skill が足すものに "the ability for Claude to load them automatically when relevant" を挙げるが、command は `disable-model-invocation` を含む同じ前付けを持ち、"work the same way" とも書く。このセッションでモデルに見える一覧には、`build-fix: Build and Fix`・`learn: /learn - Extract Reusable Patterns` のように、見出しの1行を説明にしたものがある。持ち主の `~/.claude/commands/` のファイルに見えるが、リポジトリの外なので確かめていない。どちらにしても、モデルが使うかは skill か command かより、`disable-model-invocation`・`user-invocable` で決まる
 - このアプリとの違い: このアプリでは、自作のコマンド（F-07）はモデルに一覧を送らず（`docs/request-formats.md` の場面 4）、スキル（F-08）は必ず送る。本文の形は同じ（同じ読み手 `parse_custom`）で、違いはモデルが選べるかと、付いているファイルの一覧と、`load_skill` の道だけである
 - 直したことは無い
+
+### Claude Code で、人だけが呼ぶ手順をどう作るか（2026-10-29・main 側）
+
+- 問い: 「常に人間が指定して実行させたい機能（旧来のslash commandのような）をどのように実現すべきか、想定はあるか」
+- 答え（公式の文書 https://code.claude.com/docs/en/skills を 2026-10-29 に確かめた）: 想定はある。前付けの `disable-model-invocation: true`。文書は "Use this for workflows with side effects or that you want to control timing, like `/commit`, `/deploy`, or `/send-slack-message`" と書く
+  - 説明はモデルに送らない（"This removes the skill from Claude's context entirely"）。モデルが呼ぼうとすると止め、"instructs it not to reproduce the deploy steps another way"。subagent への前読みと、予定の作業からの実行も止まる
+  - 注意: 文の途中に `/deploy` と書くと、その発言の間はモデルが呼んでよいことになる（"The name counts as your permission for that message"）。`disable-model-invocation` のスキルにも当たるかは、文書に無い。すぐ走らせるなら、発言の頭に置く
+  - ほかの手段: SKILL.md を直さずに設定の `skillOverrides` で `"user-invocable-only"` にする（モデルに見せず、`/` の一覧には出す）。許可の規則 `Skill(deploy *)` を deny にする（モデルの Skill の呼び出しを止める。利用者の `/deploy` に効くかは文書に無い）
+  - 限界（Claude Code の推論）: 止めるのはスキルを呼ぶことで、モデルが同じ操作を道具で直に行うことは、指示の文で止めるだけである。必ず止めたい操作は、その操作そのもの（`git push` など）を許可の規則か hook で止める
+  - このリポジトリの例: `.claude/skills/merge-feature/SKILL.md` は `disable-model-invocation: true` を持ち、このセッションのモデルに見える一覧に無い
+- このアプリ: 人だけが呼ぶ手順は、F-07 の自作のコマンドに書く（F-08 の仕様）。スキルにはモデルに見せない設定が無い
+- 直したことは無い
